@@ -967,7 +967,7 @@ Commit: `feat: debounce button presses`
 
 ### Task 43. Errors carry source and nature
 
-- [ ] Files: `common/errors.py`, `tests/test_errors.py`.
+- [x] Files: `common/errors.py`, `tests/test_errors.py`.
 
 This task creates only `common/errors.py` and the tests for `make_error`, `propagate`, and `banner`. The timed-out STA frame and the master LED are task 65, which runs after tasks 46, 53, and 64. That split is why this file list does not include `remote/tasks.py`.
 
