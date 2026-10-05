@@ -857,7 +857,7 @@ Commit: `feat: format forward power and SWR like the spec examples`
 
 ### Task 36. Inductance and capacitance text
 
-- [ ] Files: `common/display.py`, `tests/test_display_format.py`.
+- [x] Files: `common/display.py`, `tests/test_display_format.py`.
 
 Failing test: `format_inductance_nh(1250) == "1.25uH"`, `format_inductance_nh(50) == "0.05uH"`, `format_capacitance_pf(150) == "150pF"`, `format_capacitance_pf(0) == "0pF"`.
 
