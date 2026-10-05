@@ -93,8 +93,9 @@ def test_uart_irq_and_tx_write_move_one_at2_frame():
             self.written = bytearray()
             self.handler = None
 
-        def irq(self, handler):
+        def irq(self, handler, trigger=0):
             self.handler = handler
+            self.trigger = trigger
 
         def any(self):
             return len(self.pending)
@@ -138,6 +139,7 @@ def test_uart_irq_and_tx_write_move_one_at2_frame():
             buses.append(bus)
             return bus
 
+    Machine.UART.IRQ_RXIDLE = 0x10
     hal.bind(Machine())
     try:
         remote = boot_remote("remote")
@@ -164,6 +166,110 @@ def test_uart_irq_and_tx_write_move_one_at2_frame():
         assert mem[(0x20, 0x15)] & (1 << 2) == 0
         assert mem[(0x20, 0x15)] & (1 << 3)
         assert master.oled.shown
+    finally:
+        hal.bind(None)
+        hal.start_watchdog(3000)
+
+
+def test_uart_rxidle_drains_a_full_frame():
+    from common.commands import Command
+    from common.protocol import Frame, decode_frames, encode_frame
+    from common.scheduler import run_once
+    from remote.tasks import build_remote_tasks
+
+    opened: list[object] = []
+
+    class UART:
+        """One FIFO. irq records the trigger the board asked for."""
+
+        IRQ_RXIDLE = 0x10
+
+        def __init__(self, uart_id, baudrate=None, tx=None, rx=None, **kwargs):
+            """Remember the id and start with an empty FIFO."""
+            self.id = uart_id
+            self.pending = bytearray()
+            self.written = bytearray()
+            self.handler = None
+            self.trigger = None
+            opened.append(self)
+
+        def irq(self, handler, trigger=0):
+            """Save the handler and the trigger. The test fires the handler."""
+            self.handler = handler
+            self.trigger = trigger
+
+        def any(self):
+            """How many bytes are waiting in the FIFO."""
+            return len(self.pending)
+
+        def read(self, count):
+            """Take up to count bytes."""
+            chunk = bytes(self.pending[:count])
+            del self.pending[:count]
+            return chunk
+
+        def write(self, data):
+            """Capture TX bytes."""
+            self.written.extend(data)
+
+    class Pin:
+        """INT pin. The test does not fire it."""
+
+        def __init__(self, number, *args, **kwargs):
+            """Remember the GPIO number."""
+            self.number = number
+
+        def irq(self, handler):
+            """Accept the edge handler."""
+            self.handler = handler
+
+    class Machine:
+        """Fake machine whose UART class carries IRQ_RXIDLE."""
+
+        def WDT(self, timeout):
+            """A watchdog the boot path can arm."""
+            return type("W", (), {"feed": lambda self: None, "timeout": timeout})()
+
+        def Pin(self, number, *args, **kwargs):
+            """Return a pin that can take an irq."""
+            return Pin(number)
+
+        def I2C(self, i2c_id, scl, sda, freq=400000):
+            """A bus that remembers latch writes so a coil readback can succeed."""
+            mem: dict[tuple[int, int], int] = {}
+
+            class Bus:
+                def writeto_mem(self, addr, reg, buf):
+                    mem[(addr, reg)] = buf[0]
+
+                def readfrom_mem(self, addr, reg, nbytes):
+                    return bytes([mem.get((addr, reg), 0)] * nbytes)
+
+                def writeto(self, addr, buf):
+                    return None
+
+            return Bus()
+
+    Machine.UART = UART
+    hal.bind(Machine())
+    try:
+        remote = boot_remote("remote")
+        remote_uarts = list(opened)
+        assert remote_uarts
+        assert {uart.trigger for uart in remote_uarts} == {UART.IRQ_RXIDLE}
+        boot_master("master")
+        master_uarts = opened[len(remote_uarts) :]
+        assert master_uarts
+        assert {uart.trigger for uart in master_uarts} == {UART.IRQ_RXIDLE}
+        uart0 = next(uart for uart in remote_uarts if uart.id == 0)
+        frame = encode_frame(Frame(1, 2, 1, Command.AT2, b""))
+        uart0.pending.extend(frame)
+        uart0.handler(uart0)
+        run_once(build_remote_tasks(remote), interrupt=lambda: None, watchdog=lambda: None)
+        frames, leftover = decode_frames(bytes(uart0.written))
+        assert leftover == b""
+        assert frames[0].command is Command.ACK
+        assert frames[0].payload == bytes([Command.AT2.byte])
     finally:
         hal.bind(None)
         hal.start_watchdog(3000)

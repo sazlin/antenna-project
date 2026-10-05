@@ -74,13 +74,16 @@ def _arm_uart(uart: object, ring: object, flags: object) -> None:
     """The UART interrupt only stores bytes. Decoding waits for the task pass."""
 
     def _on_rx(source: object) -> None:
-        """Store one UART byte and leave decoding to the task pass."""
-        data = source.read(1)
-        if data:
+        """Store every waiting byte. Decoding waits for the task pass."""
+        while source.any():
+            data = source.read(1)
+            if not data:
+                break
             note_rx_byte(ring, flags, data[0])
 
-    if hasattr(uart, "irq"):
-        uart.irq(_on_rx)
+    if hal.machine is None or not hasattr(uart, "irq"):
+        return
+    uart.irq(_on_rx, hal.machine.UART.IRQ_RXIDLE)
 
 
 def _arm_pin(pin: object, flags: object) -> None:
