@@ -1303,7 +1303,7 @@ Commit: `docs: specify Pico, U094, MCP23017, OLED, and ATU-100 wiring`
 
 ### Task 57. Protocol document
 
-- [ ] Files: `docs/PROTOCOL.md`, `tests/test_docs_protocol.py`.
+- [x] Files: `docs/PROTOCOL.md`, `tests/test_docs_protocol.py`.
 
 Failing test: the doc contains the known frame `7e010201110047517f`, the CRC name `CRC-16/CCITT-FALSE`, every mnemonic in the command table, the sentence `The remote does not transmit until the master polls`, and the RS to RR to SND to RCVD order.
 
