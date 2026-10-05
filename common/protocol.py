@@ -373,6 +373,22 @@ def crc16_ccitt(data: bytes) -> int:
     return crc
 
 
+_TUNER_ACTION = {
+    Command.TUN,
+    Command.BYP0,
+    Command.BYP1,
+    Command.AM0,
+    Command.AM1,
+    Command.TST0,
+    Command.TST1,
+    Command.TUP,
+    Command.TDN,
+    Command.TSC,
+    Command.TSL,
+    Command.STA,
+}
+
+
 _ANTENNA = {
     Command.AT0: 0,
     Command.AT1: 1,
@@ -402,6 +418,7 @@ class RemoteLink:
         self._pending_status: bytes | None = None
         self._ready = True
         self.shutdown = False
+        self.execute_tuner = False
 
     def on_bytes(self, data: bytes) -> tuple[bytes | None, Action | None]:
         """Parse one master frame. A duplicate before finish sends nothing."""
@@ -452,6 +469,9 @@ class RemoteLink:
             return None, None
         if self._cached is not None and frame.sequence == self._cached_sequence:
             return self._cached, None
+        if self.execute_tuner and frame.command in _TUNER_ACTION:
+            self._open_sequence = frame.sequence
+            return None, Action(frame.command, None)
         if frame.command is Command.RPT:
             cached = self._cached_command()
             if cached is None:

@@ -1033,7 +1033,7 @@ Commit: `feat: commit an antenna only after the coil move succeeds`
 
 ### Task 63. Dispatch link actions and menu handlers
 
-- [ ] Files: `remote/tasks.py`, `master/tasks.py`, `tests/test_dispatch.py`.
+- [x] Files: `remote/tasks.py`, `master/tasks.py`, `tests/test_dispatch.py`.
 
 This task calls the helpers from tasks 13, 22 through 28, 29, 33, 34, 40, and 46. It does not change their coil or codec rules.
 

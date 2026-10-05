@@ -5,6 +5,37 @@
 from common.commands import Command
 from common.errors import ErrorCode
 
+_OPTO_BIT = {"tune": 1 << 4, "auto": 1 << 5, "bypass": 1 << 6}
+_OPTO_MASK = 0x70
+
+
+class OptoBank:
+    """Fallback optocoupler bits on GPB4, GPB5, and GPB6. Levels, not a sleep."""
+
+    def __init__(self) -> None:
+        """Start with every optocoupler off."""
+        self.value = 0
+        self.pressed: list[tuple[str, int]] = []
+        self._until: dict[int, int] = {}
+
+    def drive(self, presses: list[tuple[str, int]] | ErrorCode, now_ms: int) -> None:
+        """Raise one opto bit for the stock press time. An error presses nothing."""
+        if not isinstance(presses, list) or not presses:
+            return
+        self.pressed.extend(presses)
+        name, duration = presses[0]
+        bit = _OPTO_BIT[name]
+        self.value = (self.value & ~_OPTO_MASK) | bit
+        self._until[bit] = now_ms + duration
+
+    def service_optos(self, now_ms: int) -> None:
+        """Drop an opto bit once its press time has elapsed."""
+        for bit, deadline in list(self._until.items()):
+            if now_ms >= deadline:
+                self.value &= ~bit
+                del self._until[bit]
+
+
 _UNAVAILABLE = {
     Command.TUP,
     Command.TDN,
