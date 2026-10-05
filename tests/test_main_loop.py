@@ -16,6 +16,145 @@ def _run(tasks, feeds: list[int]) -> None:
     run_once(tasks, interrupt=lambda: None, watchdog=lambda: feeds.append(1))
 
 
+def test_menu_select_enqueues_at1_on_the_master_link():
+    from master.tasks import _master_buttons
+
+    def tap(app, name: str, at: int) -> None:
+        app.held[name] = True
+        app.now_ms = at
+        _master_buttons(app)
+        app.now_ms = at + 30
+        _master_buttons(app)
+        app.held[name] = False
+        app.now_ms = at + 31
+        _master_buttons(app)
+
+    app = MasterApp()
+    app.state.forward_w = 5.0
+    app.state.swr = 1.1
+    app.state.inductance_nh = 1250
+    app.state.capacitance_pf = 150
+    app.state.order = "LC"
+    tap(app, "Menu", 0)
+    assert app.menu.active is True
+    tap(app, "Right", 100)
+    assert app.menu.label == "Antenna 1"
+    _master_publish = __import__("master.tasks", fromlist=["_master_publish"])._master_publish
+    _master_publish(app)
+    labels = [line for line in app.panel.lines if line]
+    assert len(labels) <= 4
+    assert app.panel.lines[app.menu_highlight] == "Antenna 1"
+    tap(app, "Select", 200)
+    assert app.menu.active is False
+    app.now_ms = 400
+    _run(build_master_tasks(app), [])
+    sent = decode_frames(bytes(app.tx))[0][0]
+    assert sent.command is Command.AT1
+    _master_publish(app)
+    assert app.panel.lines[1] == "1.10"
+
+    closed = MasterApp()
+    tap_exit = tap
+    tap_exit(closed, "Menu", 0)
+    tap_exit(closed, "Up", 100)
+    assert closed.menu.label == "Exit Menu"
+    tap_exit(closed, "Select", 200)
+    assert closed.link._queue == []
+    shutdown = MasterApp()
+    tap(shutdown, "Menu", 0)
+    tap(shutdown, "Down", 40)
+    tap(shutdown, "Down", 80)
+    assert shutdown.menu.label == "Shutdown"
+    tap(shutdown, "Select", 120)
+    assert [item[0] for item in shutdown.link._queue] == [Command.F86]
+
+    from remote.tasks import _remote_buttons
+
+    def tap_remote(board, name: str, at: int) -> None:
+        board.held[name] = True
+        board.now_ms = at
+        _remote_buttons(board)
+        board.now_ms = at + 30
+        _remote_buttons(board)
+        board.held[name] = False
+        board.now_ms = at + 31
+        _remote_buttons(board)
+
+    remote = RemoteApp()
+    remote.state.link_up = False
+    tap_remote(remote, "Menu", 0)
+    tap_remote(remote, "Right", 100)
+    tap_remote(remote, "Down", 200)
+    tap_remote(remote, "Down", 300)
+    tap_remote(remote, "Down", 400)
+    assert remote.menu.label == "Antenna 4"
+    tap_remote(remote, "Select", 500)
+    assert remote.latch.read() == 0b1000
+    assert remote.tx == b""
+    stepper = RemoteApp()
+
+    def choose_step_up(board, base: int) -> None:
+        tap_remote(board, "Menu", base)
+        tap_remote(board, "Down", base + 40)
+        tap_remote(board, "Right", base + 80)
+        for step in range(7):
+            tap_remote(board, "Down", base + 120 + step)
+        assert board.menu.label == "Step up"
+        tap_remote(board, "Select", base + 200)
+
+    choose_step_up(stepper, 0)
+    choose_step_up(stepper, 1000)
+    assert stepper.port_writes == [b'{"RelayI":1}\n', b'{"RelayI":2}\n']
+
+
+def test_production_loop_feeds_the_watchdog_each_pass():
+    from common import hal
+    from master.main import boot_devices, run_production_pass
+
+    feeds: list[int] = []
+
+    class Watchdog:
+        def __init__(self, timeout: int) -> None:
+            self.timeout = timeout
+
+        def feed(self) -> None:
+            feeds.append(1)
+
+    class Machine:
+        def WDT(self, timeout: int) -> Watchdog:
+            return Watchdog(timeout)
+
+        def Pin(self, number, *args, **kwargs):
+            return number
+
+        def UART(self, uart_id, baudrate=None, tx=None, rx=None, **kwargs):
+            return type("U", (), {"id": uart_id})()
+
+        def I2C(self, i2c_id, scl, sda, freq=400000):
+            class Bus:
+                def writeto_mem(self, addr, reg, buf):
+                    return None
+
+                def readfrom_mem(self, addr, reg, nbytes):
+                    return bytes(nbytes)
+
+                def writeto(self, addr, buf):
+                    return None
+
+            return Bus()
+
+    hal.bind(Machine())
+    try:
+        board = boot_devices("master")
+        assert hal.watchdog_ms == 3000
+        run_production_pass(board)
+        assert feeds == [1]
+        assert "machine" not in __import__("sys").modules
+    finally:
+        hal.bind(None)
+        hal.start_watchdog(3000)
+
+
 def test_live_antenna_change_waits_relay_delay_ms():
     import pytest
 

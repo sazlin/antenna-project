@@ -8,7 +8,8 @@ from common.commands import Command
 from common.display import publish
 from common.errors import ErrorCode, RelayFault
 from common.hal import ByteRing, Flags, drain_rx
-from common.menu import Menu
+from common.buttons import Debouncer
+from common.menu import REMOTE_MENU, Menu, render_menu
 from common.protocol import Action, Frame, RemoteLink, Status, decode_frames, encode_frame, pack_status
 from common.state import LinkState, commit
 from remote import config
@@ -163,6 +164,9 @@ def _serial_command(
         failed = _emit_tuner(port, line, action.command, now_ms, link)
         if failed is not None:
             return link.fail(action.command, failed, 2)
+        if hasattr(port, "atu"):
+            port.atu.busy = False
+            port.atu._attempt = 0
         return link.finish(action)
     failed = _emit_tuner(port, encode_command(action.command), action.command, now_ms, link)
     if failed is not None:
@@ -263,6 +267,9 @@ def write_leds(state: LinkState, olat: object) -> None:
 
 def remote_on_press(name: str, menu: Menu, local_queue: list[str]) -> None:
     """Navigate the local menu. Select still returns a handler when the master is quiet."""
+    if name == "menu":
+        menu.open_menu()
+        return
     if name == "select":
         handler = menu.select()
         if handler and handler != "exit":
@@ -355,6 +362,10 @@ class RemoteApp:
         self.power = PowerView(0.0, 0, 0)
         self.presses: list[str] = []
         self.events: list[str] = []
+        self.held: dict[str, bool] = {}
+        self.debouncer = Debouncer(hold_ms=30)
+        self.menu = Menu(REMOTE_MENU, link_up=True)
+        self.menu_highlight = 0
         self.atu_polls = 0
         self.publishes = 0
         self.feeds = 0
@@ -482,17 +493,66 @@ def _remote_optos(app: RemoteApp) -> None:
     _copy_optos(app)
 
 
+_REMOTE_ALIAS = {
+    "Up": "up",
+    "Down": "down",
+    "Left": "left",
+    "Right": "right",
+    "Select": "select",
+    "Menu": "menu",
+    "up": "up",
+    "down": "down",
+    "left": "left",
+    "right": "right",
+    "select": "select",
+}
+
+
 def _remote_publish(app: RemoteApp) -> None:
-    """Draw the SSD1306 when it is open, otherwise the memory panel."""
+    """Draw the menu while it is open, otherwise the tuner screen."""
     app.publishes += 1
     panel = getattr(app, "oled", None) or app.panel
+    if app.menu.active:
+        labels, highlight = render_menu(app.menu)
+        app.menu_highlight = highlight
+        padded = (labels + ["", "", "", ""])[:4]
+        panel.show_lines((padded[0], padded[1], padded[2], padded[3]))
+        write_leds(app.state, app.olat)
+        return
     publish_display(app.state, panel, app.olat)
 
 
 def _remote_buttons(app: RemoteApp) -> None:
-    """Turn one debounced press into one sampled event."""
+    """Debounce a press and run it on this board's tuner and relays."""
+
+    def act(name: str) -> None:
+        local: list[str] = []
+        remote_on_press(name, app.menu, local)
+        app.events.append(name)
+        if not local:
+            return
+        run_menu_handler(
+            local[-1],
+            app.latch,
+            app.state,
+            _power_from_state(app),
+            app.state.link_up,
+            port=app,
+            mode=app.mode,
+            test_mode=app.test_mode,
+            fallback=app.fallback,
+            opto=app.opto,
+            now_ms=app.now_ms,
+        )
+
     if app.presses:
-        app.events.append(app.presses.pop(0))
+        raw = app.presses.pop(0)
+        act(_REMOTE_ALIAS.get(raw, raw))
+        return
+    for config_name, down in app.held.items():
+        app.debouncer.sample(_REMOTE_ALIAS.get(config_name, config_name), down, app.now_ms)
+    for press in app.debouncer.events():
+        act(press.name)
 
 
 def build_remote_tasks(app: RemoteApp) -> list:
@@ -535,6 +595,11 @@ def run_menu_handler(
     power: PowerView,
     link_up: bool,
     port: object | None = None,
+    mode: str = "serial",
+    test_mode: TestMode | None = None,
+    fallback: Fallback | None = None,
+    opto: OptoBank | None = None,
+    now_ms: int = 0,
 ) -> None:
     """Run a remote menu leaf locally. Exit does nothing. Shutdown is not on this menu."""
     del link_up
@@ -553,10 +618,11 @@ def run_menu_handler(
         state=state,
         power=power,
         port=port if port is not None else bytearray(),
-        mode="serial",
-        test_mode=TestMode(),
-        fallback=Fallback(),
-        opto=OptoBank(),
+        mode=mode,
+        test_mode=test_mode or TestMode(),
+        fallback=fallback or Fallback(),
+        opto=opto or OptoBank(),
+        now_ms=now_ms,
     )
 
 

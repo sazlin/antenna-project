@@ -1,9 +1,11 @@
 # Master superloop pieces. Button and menu choices become RS485 commands.
 # This module does not import the remote and it does not drive a relay.
 
+from common.buttons import Debouncer
 from common.commands import Command
 from common.display import publish
 from common.errors import ErrorCode
+from common.menu import MASTER_MENU, render_menu
 from common.hal import ByteRing, Flags, drain_rx
 from common.menu import Menu
 from common.protocol import MasterLink
@@ -48,6 +50,11 @@ def master_on_press(name: str, queue: list[Command], state: LinkState, menu: Men
         menu.open_menu()
         return
     if menu.active and name in ("up", "down", "left", "right", "select"):
+        if name == "select":
+            handler = menu.select()
+            if handler and handler != "exit":
+                queue_handler(handler, queue)
+            return
         getattr(menu, name)()
         return
     if name == "tune":
@@ -130,6 +137,10 @@ class MasterApp:
         self.now_ms = 0
         self.presses: list[str] = []
         self.events: list[str] = []
+        self.held: dict[str, bool] = {}
+        self.debouncer = Debouncer(hold_ms=30)
+        self.menu = Menu(MASTER_MENU)
+        self.menu_highlight = 0
         self.publishes = 0
         self.shared: dict[str, float | None] = {}
         self.panel = type("Panel", (), {"lines": None, "show_lines": lambda self, lines: setattr(self, "lines", lines)})()
@@ -182,17 +193,58 @@ def _master_poll(app: MasterApp) -> None:
         app.note_loss()
 
 
+_MASTER_ALIAS = {
+    "Up": "up",
+    "Down": "down",
+    "Left": "left",
+    "Right": "right",
+    "Select": "select",
+    "Tune": "tune",
+    "A/M": "am",
+    "Bypass": "bypass",
+    "Antenna Select": "antenna",
+    "Menu": "menu",
+}
+
+
+def _show_menu(app: MasterApp, panel: object) -> None:
+    """Four menu labels while the menu is open. The highlight row is the current item."""
+    labels, highlight = render_menu(app.menu)
+    app.menu_highlight = highlight
+    padded = (labels + ["", "", "", ""])[:4]
+    panel.show_lines((padded[0], padded[1], padded[2], padded[3]))
+    write_leds(app.state, app.olat)
+
+
 def _master_publish(app: MasterApp) -> None:
     """Draw the SSD1306 when it is open, otherwise the memory panel."""
     app.publishes += 1
     panel = getattr(app, "oled", None) or app.panel
+    if app.menu.active:
+        _show_menu(app, panel)
+        return
     publish_display(app.state, panel, app.olat)
 
 
+def _emit_master_press(app: MasterApp, name: str) -> None:
+    """Queue the command and give it to the poller."""
+    pending: list[Command] = []
+    master_on_press(name, pending, app.state, app.menu)
+    for command in pending:
+        app.link.enqueue(command)
+    app.events.append(name)
+
+
 def _master_buttons(app: MasterApp) -> None:
-    """Turn one debounced press into one sampled event."""
+    """Debounce MCP or injected presses, then run the button helper."""
     if app.presses:
-        app.events.append(app.presses.pop(0))
+        raw = app.presses.pop(0)
+        _emit_master_press(app, _MASTER_ALIAS.get(raw, raw))
+        return
+    for config_name, down in app.held.items():
+        app.debouncer.sample(_MASTER_ALIAS.get(config_name, config_name), down, app.now_ms)
+    for press in app.debouncer.events():
+        _emit_master_press(app, press.name)
 
 
 def build_master_tasks(app: MasterApp) -> list:
