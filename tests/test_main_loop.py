@@ -67,6 +67,68 @@ def test_ack_clears_communication_lost_and_stale_power_drops_rf_present():
     assert stale.olat.port_b & (1 << 6) == 0
 
 
+def test_mcp_gpio_press_enqueues_tune():
+    from master.main import _interrupt as master_interrupt
+    from remote.main import _interrupt as remote_interrupt
+
+    class Chip:
+        def __init__(self) -> None:
+            self.levels = (0xFF, 0xFF)
+
+        def read_gpio(self) -> tuple[int, int]:
+            return self.levels
+
+    def one_pass(app, interrupt) -> None:
+        run_once(app.tasks, interrupt=lambda: interrupt(app), watchdog=lambda: None)
+
+    master = MasterApp()
+    master.tasks = build_master_tasks(master)
+    chip = Chip()
+    master.mcp = chip
+    chip.levels = (0xFF & ~(1 << 5), 0xFF)
+    master.mcp_flag.mcp = True
+    master.now_ms = 1000
+    one_pass(master, master_interrupt)
+    chip.levels = (0xFF, 0xFF)
+    master.mcp_flag.mcp = True
+    master.now_ms = 1030
+    one_pass(master, master_interrupt)
+    assert [item[0] for item in master.link._queue] == [Command.TUN]
+
+    short = MasterApp()
+    short.tasks = build_master_tasks(short)
+    short_chip = Chip()
+    short.mcp = short_chip
+    short_chip.levels = (0xFF & ~(1 << 5), 0xFF)
+    short.mcp_flag.mcp = True
+    short.now_ms = 0
+    one_pass(short, master_interrupt)
+    short_chip.levels = (0xFF, 0xFF)
+    short.mcp_flag.mcp = True
+    short.now_ms = 29
+    one_pass(short, master_interrupt)
+    assert short.link._queue == []
+
+    remote = RemoteApp()
+    remote.tasks = build_remote_tasks(remote)
+    remote.state.link_up = False
+    remote.menu.open_menu()
+    remote.menu.right()
+    assert remote.menu.label == "Antenna 1"
+    remote_chip = Chip()
+    remote.mcp = remote_chip
+    remote_chip.levels = (0xFF & ~(1 << 4), 0xFF)
+    remote.mcp_flag.mcp = True
+    remote.now_ms = 2000
+    one_pass(remote, remote_interrupt)
+    remote_chip.levels = (0xFF, 0xFF)
+    remote.mcp_flag.mcp = True
+    remote.now_ms = 2030
+    one_pass(remote, remote_interrupt)
+    assert remote.latch.read() == 0b0001
+    assert remote.tx == b""
+
+
 def test_menu_select_enqueues_at1_on_the_master_link():
     from master.tasks import _master_buttons
 

@@ -102,7 +102,7 @@ def _interrupt(app: RemoteApp) -> None:
     if not app.mcp_flag.mcp:
         return
     if getattr(app, "mcp", None) is not None:
-        app.mcp.read_gpio()
+        app.gpio_sample = app.mcp.read_gpio()
     app.mcp_flag.mcp = False
 
 

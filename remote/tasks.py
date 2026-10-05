@@ -8,7 +8,7 @@ from common.commands import Command
 from common.display import publish
 from common.errors import ErrorCode, RelayFault
 from common.hal import ByteRing, Flags, drain_rx
-from common.buttons import Debouncer
+from common.buttons import Debouncer, changes
 from common.menu import REMOTE_MENU, Menu, render_menu
 from common.protocol import Action, Frame, RemoteLink, Status, decode_frames, encode_frame, pack_status
 from common.state import LinkState, commit
@@ -371,6 +371,8 @@ class RemoteApp:
         self.publishes = 0
         self.feeds = 0
         self.mcp_flag = Flags()
+        self.gpio_sample: tuple[int, int] | None = None
+        self.button_mask = 0xFFFF
         self.shared: dict[str, float | None] = {}
         self.panel = _Panel()
         self.olat = _Olat()
@@ -550,6 +552,14 @@ def _remote_buttons(app: RemoteApp) -> None:
         raw = app.presses.pop(0)
         act(_REMOTE_ALIAS.get(raw, raw))
         return
+    sample = app.gpio_sample
+    if sample is not None:
+        app.gpio_sample = None
+        port_a, _port_b = sample
+        current = port_a & 0x1F
+        for name, down in changes(app.button_mask, current, config.REMOTE_BUTTONS):
+            app.debouncer.sample(_REMOTE_ALIAS.get(name, name), down, app.now_ms)
+        app.button_mask = current
     for config_name, down in app.held.items():
         app.debouncer.sample(_REMOTE_ALIAS.get(config_name, config_name), down, app.now_ms)
     for press in app.debouncer.events():

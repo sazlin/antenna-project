@@ -1,7 +1,7 @@
 # Master superloop pieces. Button and menu choices become RS485 commands.
 # This module does not import the remote and it does not drive a relay.
 
-from common.buttons import Debouncer
+from common.buttons import Debouncer, changes
 from common.commands import Command
 from common.display import publish
 from common.errors import ErrorCode
@@ -152,6 +152,8 @@ class MasterApp:
         self.panel = type("Panel", (), {"lines": None, "show_lines": lambda self, lines: setattr(self, "lines", lines)})()
         self.olat = type("Olat", (), {"port_a": 0, "port_b": 0})()
         self.mcp_flag = Flags()
+        self.gpio_sample: tuple[int, int] | None = None
+        self.button_mask = 0xFFFF
         self._announced_loss = False
 
     def note_loss(self) -> None:
@@ -251,6 +253,14 @@ def _master_buttons(app: MasterApp) -> None:
         raw = app.presses.pop(0)
         _emit_master_press(app, _MASTER_ALIAS.get(raw, raw))
         return
+    sample = app.gpio_sample
+    if sample is not None:
+        app.gpio_sample = None
+        port_a, port_b = sample
+        current = (port_a & 0xFF) | ((port_b & 0x03) << 8)
+        for name, down in changes(app.button_mask, current, master_config.MASTER_BUTTONS):
+            app.debouncer.sample(_MASTER_ALIAS.get(name, name), down, app.now_ms)
+        app.button_mask = current
     for config_name, down in app.held.items():
         app.debouncer.sample(_MASTER_ALIAS.get(config_name, config_name), down, app.now_ms)
     for press in app.debouncer.events():
