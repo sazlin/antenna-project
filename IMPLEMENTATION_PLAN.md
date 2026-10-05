@@ -632,7 +632,7 @@ Commit: `feat: force relays off when two coils read back on`
 
 ### Task 24. Readback mismatch forces all off
 
-- [ ] Files: `remote/relays.py`, `tests/test_relays.py`.
+- [x] Files: `remote/relays.py`, `tests/test_relays.py`.
 
 Failing test: latch `write` of the target bit is followed by `read` returning `0b0011`. `set_antenna(..., 1, ...)` raises `RelayFault` and the last write is 0.
 

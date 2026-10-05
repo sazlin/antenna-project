@@ -19,6 +19,22 @@ class FakeLatch:
         return self.value
 
 
+class MismatchLatch(FakeLatch):
+    """Reads the target bit back as two bits so the coil check must open everything."""
+
+    def read(self) -> int:
+        if self.writes and self.writes[-1] == 0b0001:
+            return 0b0011
+        return self.value
+
+
+def test_readback_mismatch_forces_off():
+    latch = MismatchLatch(0)
+    with pytest.raises(RelayFault):
+        set_antenna(latch, 1, delay_ms=100, sleep=lambda _ms: None)
+    assert latch.writes[-1] == 0
+
+
 def test_two_bits_already_set_forces_off():
     latch = FakeLatch(0b0101)
     slept: list[int] = []
