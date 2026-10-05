@@ -96,11 +96,54 @@ def _status_from_object(obj: dict[str, object]) -> TunerStatus | None:
 class AtuLink:
     """Half-duplex ukoda port. feed parses whatever has arrived."""
 
-    def __init__(self, port: object | None = None) -> None:
-        """Hold the UART stand-in and an incomplete JSON buffer."""
+    def __init__(
+        self,
+        port: object | None = None,
+        *,
+        timeout_ms: int = 500,
+        tries: int = 3,
+        tune_timeout_ms: int = 30000,
+    ) -> None:
+        """Hold the UART stand-in. One command is outstanding at a time."""
         self.port = bytearray() if port is None else port
+        self.timeout_ms = timeout_ms
+        self.tries = tries
+        self.tune_timeout_ms = tune_timeout_ms
         self._rx = ""
         self.busy = False
+        self._command: Command | None = None
+        self._sent_ms = 0
+        self._attempt = 0
+
+    def send(self, command: Command, now_ms: int) -> ErrorCode | None:
+        """Write one line unless a reply is already outstanding."""
+        if self.busy:
+            return ErrorCode.FAILED_TO_EXECUTE
+        self._attempt = 0
+        self._write(command, now_ms)
+        return None
+
+    def poll(self, now_ms: int) -> ErrorCode | None:
+        """Retry a normal command three times. Tune waits out the long timer."""
+        if not self.busy or self._command is None:
+            return None
+        limit = self.tune_timeout_ms if self._command is Command.TUN else self.timeout_ms
+        if now_ms - self._sent_ms < limit:
+            return None
+        if self._command is not Command.TUN and self._attempt < self.tries:
+            self._write(self._command, now_ms)
+            return None
+        self.busy = False
+        self._attempt = 0
+        return ErrorCode.RESOURCE_OFFLINE
+
+    def _write(self, command: Command, now_ms: int) -> None:
+        """Put one ukoda line on the port and start its reply timer."""
+        self.port.write(encode_command(command))
+        self.busy = True
+        self._command = command
+        self._sent_ms = now_ms
+        self._attempt += 1
 
     def feed(self, data: bytes) -> TunerStatus | ErrorCode | None:
         """Append bytes. A finished object that is not JSON is data corrupted."""
@@ -114,8 +157,10 @@ class AtuLink:
             obj = json.loads(piece)
         except json.JSONDecodeError:
             self.busy = False
+            self._attempt = 0
             return ErrorCode.DATA_CORRUPTED
         self.busy = False
+        self._attempt = 0
         return _status_from_object(obj)
 
 

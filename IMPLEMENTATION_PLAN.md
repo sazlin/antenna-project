@@ -779,7 +779,7 @@ Commit: `feat: treat malformed ukoda JSON as data corrupted`
 
 ### Task 32. Half duplex and tune busy
 
-- [ ] Files: `remote/atu_link.py`, `tests/test_atu_json.py`.
+- [x] Files: `remote/atu_link.py`, `tests/test_atu_json.py`.
 
 Failing test `test_second_send_while_waiting_fails`: `send(Command.STA, now_ms=0)` writes `{"Status":true}\n` and `busy` is true. A second `send(Command.AM0, now_ms=10)` writes nothing and returns `ErrorCode.FAILED_TO_EXECUTE`.
 

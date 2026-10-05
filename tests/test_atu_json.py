@@ -19,6 +19,55 @@ _MULTILINE = """\
 """.encode()
 
 
+class _Port:
+    def __init__(self) -> None:
+        self.writes: list[bytes] = []
+
+    def write(self, data: bytes) -> None:
+        self.writes.append(data)
+
+
+def test_second_send_while_waiting_fails():
+    port = _Port()
+    link = AtuLink(port)
+    assert link.send(Command.STA, now_ms=0) is None
+    assert port.writes == [b'{"Status":true}\n']
+    assert link.busy is True
+    assert link.send(Command.AM0, now_ms=10) is ErrorCode.FAILED_TO_EXECUTE
+    assert port.writes == [b'{"Status":true}\n']
+
+
+def test_status_is_retried_three_times():
+    port = _Port()
+    link = AtuLink(port)
+    link.send(Command.STA, now_ms=0)
+    link.poll(500)
+    link.poll(1000)
+    result = link.poll(1500)
+    assert port.writes == [b'{"Status":true}\n', b'{"Status":true}\n', b'{"Status":true}\n']
+    assert link.busy is False
+    assert result is ErrorCode.RESOURCE_OFFLINE
+
+
+def test_reply_on_first_try_sends_once():
+    port = _Port()
+    link = AtuLink(port)
+    link.send(Command.STA, now_ms=0)
+    link.feed(b'{"Forward":1.0}\n')
+    link.poll(500)
+    assert len(port.writes) == 1
+
+
+def test_tune_uses_the_long_timeout():
+    port = _Port()
+    link = AtuLink(port)
+    link.send(Command.TUN, now_ms=0)
+    link.poll(29999)
+    assert link.busy is True
+    link.poll(30000)
+    assert link.busy is False
+
+
 def test_broken_json_is_data_corrupted():
     link = AtuLink(port=bytearray())
     assert link.feed(b'{"Forward":}\n') is ErrorCode.DATA_CORRUPTED
