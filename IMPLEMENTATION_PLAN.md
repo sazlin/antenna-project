@@ -358,7 +358,7 @@ Commit: `feat: escape start, end, and escape bytes in RS485 payloads`
 
 ### Task 06. Reject a truncated frame
 
-- [ ] Files: `common/protocol.py`, `tests/test_frame.py`.
+- [x] Files: `common/protocol.py`, `tests/test_frame.py`.
 
 Failing test: `decode_frames(bytes.fromhex("7e010201110047"))` returns no frames and keeps those bytes as leftover. It does not raise.
 

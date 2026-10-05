@@ -7,6 +7,13 @@ def test_encode_at1_matches_known_frame():
     assert encode_frame(frame).hex() == "7e010201110047517f"
 
 
+def test_truncated_frame_waits():
+    partial = bytes.fromhex("7e010201110047")
+    frames, leftover = decode_frames(partial)
+    assert frames == []
+    assert leftover == partial
+
+
 def test_payload_special_bytes_round_trip():
     payload = bytes([0x7E, 0x00, 0x7D, 0x7F])
     frame = Frame(source=1, destination=2, sequence=3, command=Command.SND, payload=payload)

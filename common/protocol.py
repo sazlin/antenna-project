@@ -74,6 +74,8 @@ def _frame_from_body(body: bytes) -> Frame | None:
     """Turn an unescaped body into a frame when the length byte matches."""
     if len(body) < 5 or len(body) != 5 + body[4]:
         return None
+    if body[3] not in CODE_TO_COMMAND:
+        return None
     return Frame(
         source=body[0],
         destination=body[1],
@@ -83,18 +85,47 @@ def _frame_from_body(body: bytes) -> Frame | None:
     )
 
 
-def decode_frames(data: bytes) -> tuple[list[Frame], bytes]:
-    """Decode one complete unescaped frame. Anything else is not delivered."""
-    if len(data) < 9 or data[0] != START or data[-1] != END:
-        return [], b""
-    raw = _unescape(data[1:-1])
+def _checked_frame(raw: bytes) -> Frame | None:
+    """Accept raw body plus CRC only when both the CRC and the length match."""
+    if len(raw) < 7:
+        return None
     body, crc_lo, crc_hi = raw[:-2], raw[-2], raw[-1]
     if crc16_ccitt(body) != (crc_lo | (crc_hi << 8)):
-        return [], b""
-    frame = _frame_from_body(body)
-    if frame is None:
-        return [], b""
-    return [frame], b""
+        return None
+    return _frame_from_body(body)
+
+
+def _unescaped_end(data: bytes, start: int) -> int | None:
+    """Find the end marker. An escaped 0x7F is payload, not the end of the frame."""
+    index = start + 1
+    size = len(data)
+    while index < size:
+        if data[index] == ESCAPE:
+            index += 2
+            continue
+        if data[index] == END:
+            return index
+        index += 1
+    return None
+
+
+def decode_frames(data: bytes) -> tuple[list[Frame], bytes]:
+    """Return every good frame. Bytes with no end marker stay in the leftover."""
+    frames: list[Frame] = []
+    index = 0
+    size = len(data)
+    while index < size:
+        if data[index] != START:
+            index += 1
+            continue
+        end = _unescaped_end(data, index)
+        if end is None:
+            return frames, data[index:]
+        frame = _checked_frame(_unescape(data[index + 1 : end]))
+        if frame is not None:
+            frames.append(frame)
+        index = end + 1
+    return frames, b""
 
 
 def crc16_ccitt(data: bytes) -> int:
