@@ -1,3 +1,6 @@
+import pytest
+
+from common.errors import RelayFault
 from remote.relays import set_antenna
 
 
@@ -14,6 +17,15 @@ class FakeLatch:
 
     def read(self) -> int:
         return self.value
+
+
+def test_two_bits_already_set_forces_off():
+    latch = FakeLatch(0b0101)
+    slept: list[int] = []
+    with pytest.raises(RelayFault):
+        set_antenna(latch, 3, delay_ms=100, sleep=slept.append)
+    assert latch.writes[-1] == 0
+    assert slept == []
 
 
 def test_set_antenna_one_coil_after_all_off():

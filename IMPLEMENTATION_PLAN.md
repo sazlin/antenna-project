@@ -618,7 +618,7 @@ Commit: `feat: energize at most one antenna relay`
 
 ### Task 23. A latch that already has two bits forces all off
 
-- [ ] Files: `remote/relays.py`, `tests/test_relays.py`.
+- [x] Files: `remote/relays.py`, `tests/test_relays.py`.
 
 Failing test: latch reads `0b0101` before the call. `set_antenna(..., 3, ...)` raises `RelayFault`. The last write is 0. The sleeper was not called.
 
