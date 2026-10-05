@@ -1132,7 +1132,7 @@ Commit: `feat: drive the MCP23017 latch for relay readback`
 
 ### Task 51. SSD1306 init and one character
 
-- [ ] Files: `common/ssd1306.py`, `tests/test_ssd1306.py`.
+- [x] Files: `common/ssd1306.py`, `tests/test_ssd1306.py`.
 
 Failing test: `SSD1306(FakeI2C(), 0x3C)`. `init()` writes `0x8D` then `0x14` (charge pump on), and still writes display-off `0xAE` and display-on `0xAF`, all to address `0x3C` with control byte `0x00` on the command writes. `draw_char(0, 0, "A")` sets an 8 by 8 block in page 0 that is not all zeros. `show_lines(("100.0W", "1.15", "1.25uH", "150pF"))` puts line 2's glyphs on page 1. The charge-pump bytes are required or the panel stays blank. Addresses `0x3C` and `0x20` stay as frozen.
 
