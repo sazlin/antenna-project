@@ -42,6 +42,48 @@ def _efficiency_screen(reading: Reading) -> bool:
     return True
 
 
+def render_banner(text: str) -> tuple[str, str, str, str]:
+    """Wrap a fault on spaces into four lines of at most 16 characters."""
+    lines = ["", "", "", ""]
+    row = 0
+    current = ""
+    for word in text.split():
+        candidate = word if not current else f"{current} {word}"
+        if len(candidate) <= 16:
+            current = candidate
+            continue
+        lines[row] = current
+        row += 1
+        current = word
+    if current:
+        lines[row] = current
+    return (lines[0], lines[1], lines[2], lines[3])
+
+
+def _reading_from_state(state: object) -> Reading:
+    """Copy the tuner fields publish needs. The banner is handled separately."""
+    return Reading(
+        forward_w=state.forward_w or 0.0,
+        swr=state.swr or 0.0,
+        inductance_nh=state.inductance_nh or 0,
+        capacitance_pf=state.capacitance_pf or 0,
+        auto=state.auto,
+        bypass=state.bypass,
+        order=state.order or "LC",
+        efficiency=state.efficiency_pct,
+        antenna_w=state.antenna_w,
+    )
+
+
+def publish(state: object, panel: object) -> None:
+    """Send the banner when one is set, otherwise the tuner screen."""
+    if state.banner:
+        lines = render_banner(state.banner)
+    else:
+        lines = screen_lines(_reading_from_state(state))
+    panel.show_lines(lines)
+
+
 def screen_lines(reading: Reading) -> tuple[str, str, str, str]:
     """Build the four tuner lines. LC puts L above C. CL swaps them."""
     line1 = _line1(format_power(reading.forward_w), _marker(reading))
