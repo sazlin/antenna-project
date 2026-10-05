@@ -646,7 +646,7 @@ Commit: `feat: force relays off when the latch readback mismatches`
 
 ### Task 25. The same antenna does not drop the coil
 
-- [ ] Files: `remote/relays.py`, `tests/test_relays.py`.
+- [x] Files: `remote/relays.py`, `tests/test_relays.py`.
 
 Failing test: `apply_antenna_command(latch, state, target=2, now_ms=0, forward_w=0.0, sample_ms=0, threshold_w=1.0, enabled=True, stale_ms=1000, delay_ms=100, sleep=sleeper)` with `state.antenna == 2` and latch already `0b0010` returns None and writes nothing. `sleeper` was not called.
 

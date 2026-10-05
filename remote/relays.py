@@ -4,7 +4,32 @@
 
 from collections.abc import Callable
 
-from common.errors import RelayFault
+from common.errors import ErrorCode, RelayFault
+from common.state import LinkState
+
+
+def apply_antenna_command(
+    latch: object,
+    state: LinkState,
+    *,
+    target: int,
+    now_ms: int,
+    forward_w: float | None,
+    sample_ms: int,
+    threshold_w: float,
+    enabled: bool,
+    stale_ms: int,
+    delay_ms: int,
+    sleep: Callable[[int], None],
+) -> ErrorCode | None:
+    """Select an antenna. The coil stays closed when that antenna is already on it."""
+    bit = 0 if target == 0 else 1 << (target - 1)
+    if state.antenna == target and latch.read() == bit:
+        return None
+    # now_ms, forward_w, sample_ms, threshold_w, enabled, and stale_ms
+    # are the hot-switch inputs. The comparison is added with that test.
+    set_antenna(latch, target, delay_ms, sleep)
+    return None
 
 
 def set_antenna(latch: object, target: int, delay_ms: int, sleep: Callable[[int], None]) -> None:
