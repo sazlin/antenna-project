@@ -29,6 +29,23 @@ def test_idle_poll_sends_hhh():
     assert "TX HHH" in link.log
 
 
+def test_three_tries_then_one_miss():
+    link = MasterLink(poll_ms=200, reply_timeout_ms=500, reply_tries=3, miss_limit=5)
+    first = decode_frames(link.poll(200))[0][0]
+    assert first.sequence == 1
+    assert link.poll(699) is None
+    second = decode_frames(link.poll(700))[0][0]
+    assert second.sequence == 1
+    third = decode_frames(link.poll(1200))[0][0]
+    assert third.sequence == 1
+    assert link.poll(1700) is None
+    assert link.misses == 1
+    assert link.link_lost is False
+    nxt = decode_frames(link.poll(1900))[0][0]
+    assert nxt.sequence == 2
+    assert nxt.command is Command.HHH
+
+
 def test_sequence_skips_zero():
     link = MasterLink(poll_ms=200, reply_timeout_ms=500, reply_tries=3, miss_limit=5)
     seen = []

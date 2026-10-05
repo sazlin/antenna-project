@@ -436,7 +436,7 @@ Commit: `feat: poll the remote with HHH when the master is idle`
 
 ### Task 11. Retry the same sequence, then count a miss
 
-- [ ] Files: `common/protocol.py`, `tests/test_link_master.py`.
+- [x] Files: `common/protocol.py`, `tests/test_link_master.py`.
 
 Failing test: after `poll(200)` sends sequence 1, `poll(699)` returns None (499 ms later). `poll(700)` returns the same sequence 1 HHH again. `poll(1200)` returns the third copy. `poll(1700)` returns None and `misses == 1`. The next idle poll uses sequence 2. `link_lost` is still false.
 
