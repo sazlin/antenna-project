@@ -1277,7 +1277,7 @@ Commit: `docs: record client decisions and the engineering assumptions`
 
 ### Task 56. Wiring document
 
-- [ ] Files: `docs/WIRING.md`, `tests/test_docs_wiring.py`.
+- [x] Files: `docs/WIRING.md`, `tests/test_docs_wiring.py`.
 
 Failing test: the doc contains all of these strings: `GPIO 8`, `GPIO 9`, `GPIO 0`, `GPIO 1`, `GPIO 4`, `GPIO 5`, `GPIO 10`, `GPIO 11`, `0x3C`, `0x20`, `GPIO 23`, `GPIO 29`, `74AHCT1G125`, `2.2k`, `3.3k`, `RB1`, `RB2`, `RB0`, `yellow`, `white`, `VBUS`, `100k`, `Communication Lost` is not required here. It must contain `physical A/M and Bypass buttons are not usable` and `do not wire fallback optocouplers and the UART at the same time`.
 
