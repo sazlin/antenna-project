@@ -2,6 +2,8 @@
 # The remote is the only board that drives antenna relays. This module
 # never touches a relay coil. It only checks bytes on the U094 link.
 
+from __future__ import annotations
+
 import struct
 from dataclasses import dataclass
 
@@ -75,6 +77,139 @@ def pack_status(status: Status) -> bytes:
         status.error_code,
         status.error_source,
     )
+
+
+@dataclass
+class _Pending:
+    """One master command still waiting for the remote's reply."""
+
+    sequence: int
+    command: Command
+    payload: bytes
+    tries: int
+    sent_ms: int
+    raw: bytes
+
+
+class MasterLink:
+    """Master side of the polled RS485 link. Time is passed in. It does not sleep."""
+
+    def __init__(
+        self,
+        *,
+        poll_ms: int,
+        reply_timeout_ms: int,
+        reply_tries: int,
+        miss_limit: int,
+    ) -> None:
+        """Remember the poll, retry, and link-loss limits from config."""
+        self.poll_ms = poll_ms
+        self.reply_timeout_ms = reply_timeout_ms
+        self.reply_tries = reply_tries
+        self.miss_limit = miss_limit
+        self.misses = 0
+        self.link_lost = False
+        self.log: list[str] = []
+        self._sequence = 1
+        self._pending: _Pending | None = None
+        self._next_poll_ms = poll_ms
+        self._phase = "idle"
+        self._status: Status | None = None
+        self._buffer = bytearray()
+
+    def poll(self, now_ms: int) -> bytes | None:
+        """Send the next master frame, or None while a reply is still in time."""
+        if self._pending is not None:
+            return self._wait_or_retry(now_ms)
+        if self._phase == "saw_rs":
+            return self._transmit(Command.RR, b"", now_ms)
+        if self._phase == "saw_snd":
+            raw = self._transmit(Command.RCVD, b"", now_ms)
+            self._phase = "idle"
+            return raw
+        if now_ms < self._next_poll_ms:
+            return None
+        return self._transmit(Command.HHH, b"", now_ms)
+
+    def feed(self, data: bytes) -> None:
+        """Accept remote bytes. An ACK for the open sequence frees the next poll."""
+        self._buffer.extend(data)
+        frames, leftover = decode_frames(bytes(self._buffer))
+        self._buffer = bytearray(leftover)
+        for frame in frames:
+            self._accept(frame)
+
+    def status(self) -> Status | None:
+        """Return the last SND payload the remote delivered, if one has arrived."""
+        return self._status
+
+    def display_banner(self) -> str:
+        """Return the link-loss line, or an empty string while the remote answers."""
+        if self.link_lost:
+            return "Communication Lost"
+        return ""
+
+    def _transmit(self, command: Command, payload: bytes, now_ms: int) -> bytes:
+        """Send a new sequence. Sequence 0 is skipped so a cleared counter cannot alias."""
+        sequence = self._sequence
+        self._sequence = 1 if sequence == 255 else sequence + 1
+        frame = Frame(1, 2, sequence, command, payload)
+        raw = encode_frame(frame)
+        self._pending = _Pending(sequence, command, payload, 1, now_ms, raw)
+        self.log.append(f"TX {command.mnemonic}")
+        return raw
+
+    def _wait_or_retry(self, now_ms: int) -> bytes | None:
+        """Repeat the same frame until reply_tries, then count one miss."""
+        pending = self._pending
+        assert pending is not None
+        if now_ms - pending.sent_ms < self.reply_timeout_ms:
+            return None
+        if pending.tries < self.reply_tries:
+            pending.tries += 1
+            pending.sent_ms = now_ms
+            self.log.append(f"TX {pending.command.mnemonic}")
+            return pending.raw
+        self.misses += 1
+        self._pending = None
+        self._phase = "idle"
+        if self.misses >= self.miss_limit:
+            self.link_lost = True
+        self._next_poll_ms = now_ms + self.poll_ms
+        return None
+
+    def _accept(self, frame: Frame) -> None:
+        """Match a reply to the open sequence and advance the status handshake."""
+        pending = self._pending
+        if pending is None or frame.sequence != pending.sequence:
+            return
+        self.log.append(f"RX {_rx_label(frame)}")
+        if frame.command is Command.RS:
+            self._phase = "saw_rs"
+            self._release(pending.sent_ms)
+            return
+        if frame.command is Command.SND:
+            self._status = unpack_status(frame.payload)
+            self._phase = "saw_snd"
+            self._release(pending.sent_ms)
+            return
+        if frame.command is Command.ACK:
+            self.link_lost = False
+            self.misses = 0
+            self._phase = "idle"
+            self._release(pending.sent_ms)
+
+    def _release(self, sent_ms: int) -> None:
+        """Drop the open reply and arm the next idle poll one period later."""
+        self._pending = None
+        self._next_poll_ms = sent_ms + self.poll_ms
+
+
+def _rx_label(frame: Frame) -> str:
+    """Log ACK with the command it confirms, for example RX ACK AT1."""
+    if frame.command is Command.ACK and frame.payload and frame.payload[0] in CODE_TO_COMMAND:
+        return f"ACK {CODE_TO_COMMAND[frame.payload[0]].mnemonic}"
+    return frame.command.mnemonic
 
 
 def unpack_status(data: bytes) -> Status:

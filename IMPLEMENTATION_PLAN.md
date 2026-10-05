@@ -416,7 +416,7 @@ Commit: `feat: pack tuner status into the SND payload`
 
 ### Task 10. Master idle poll is HHH
 
-- [ ] Files: `common/protocol.py`, `tests/test_link_master.py`.
+- [x] Files: `common/protocol.py`, `tests/test_link_master.py`.
 
 Failing test: `MasterLink(poll_ms=200, reply_timeout_ms=500, reply_tries=3, miss_limit=5)`. `poll(0)` returns None. `poll(200)` returns one encoded frame whose command is HHH, source 1, destination 2, sequence 1. `poll(201)` returns None while that reply is outstanding. Log contains `TX HHH`.
 
