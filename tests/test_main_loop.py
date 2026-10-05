@@ -548,6 +548,76 @@ def test_remote_silence_sets_communication_lost():
     assert app.state.link_up is True
 
 
+def test_rst_rdy_releases_the_open_poll():
+    from common.protocol import MasterLink
+
+    link = MasterLink(poll_ms=200, reply_timeout_ms=500, reply_tries=3, miss_limit=5)
+    hhh = decode_frames(link.poll(200))[0][0]
+    assert hhh.command is Command.HHH
+    link.misses = 2
+    link.link_lost = True
+    link.feed(encode_frame(Frame(2, 1, hhh.sequence, Command.RST_RDY, b"")))
+    assert link._pending is None
+    assert link.misses == 0
+    assert link.link_lost is False
+    assert link.last_err is None
+    nxt = decode_frames(link.poll(400))[0][0]
+    assert nxt.command is Command.HHH
+    assert nxt.sequence != hhh.sequence
+
+    held = MasterLink(poll_ms=200, reply_timeout_ms=500, reply_tries=3, miss_limit=5)
+    open_hhh = decode_frames(held.poll(200))[0][0]
+    held.feed(encode_frame(Frame(2, 1, open_hhh.sequence + 1, Command.RST_RDY, b"")))
+    assert held._pending is not None
+    assert held.poll(400) is None
+
+    lost = MasterApp()
+    lost.state.antenna = 3
+    lost.state.forward_w = 5.0
+    lost.state.banner = "Communication Lost"
+    lost.state.link_up = False
+    lost.now_ms = 200
+    _run(build_master_tasks(lost), [])
+    sent = decode_frames(bytes(lost.tx))[0][0]
+    lost.tx.clear()
+    _load(
+        lost.rs485,
+        lost.rs485_flags,
+        encode_frame(Frame(2, 1, sent.sequence, Command.RST_RDY, b"")),
+    )
+    _run(build_master_tasks(lost), [])
+    assert lost.state.banner == ""
+    assert lost.state.link_up is True
+    assert lost.state.antenna == 3
+    assert lost.state.forward_w == 5.0
+    assert lost.link.saw_ack is True
+
+    hot = MasterApp()
+    hot.state.banner = "Hot switch"
+    hot.now_ms = 200
+    _run(build_master_tasks(hot), [])
+    hot_sent = decode_frames(bytes(hot.tx))[0][0]
+    hot.tx.clear()
+    _load(
+        hot.rs485,
+        hot.rs485_flags,
+        encode_frame(Frame(2, 1, hot_sent.sequence, Command.RST_RDY, b"")),
+    )
+    _run(build_master_tasks(hot), [])
+    assert hot.state.banner == "Hot switch"
+
+    remote = RemoteApp()
+    remote.state.antenna = 3
+    remote.latch.value = 0b0100
+    remote.now_ms = 100
+    _load(remote.rs485, remote.rs485_flags, encode_frame(Frame(1, 2, 1, Command.HHH, b"")))
+    _run(build_remote_tasks(remote), [])
+    ready, _leftover = decode_frames(bytes(remote.tx))
+    assert ready[0].command is Command.RST_RDY
+    assert remote.latch.value == 0b0100
+    assert remote.latch.writes == []
+
+
 def test_noise_byte_does_not_clear_communication_lost():
     app = RemoteApp()
     app.state.antenna = 3

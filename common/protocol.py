@@ -221,7 +221,7 @@ class MasterLink:
             self._phase = "saw_snd"
             self._release(pending.sent_ms)
             return
-        if frame.command is Command.ACK:
+        if frame.command is Command.ACK or frame.command is Command.RST_RDY:
             self.saw_ack = True
             self.link_lost = False
             self.misses = 0
