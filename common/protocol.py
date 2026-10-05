@@ -398,6 +398,7 @@ class RemoteLink:
         self._open_sequence: int | None = None
         self._cached: bytes | None = None
         self._cached_sequence: int | None = None
+        self._pending_status: bytes | None = None
 
     def on_bytes(self, data: bytes) -> tuple[bytes | None, Action | None]:
         """Parse one master frame. A duplicate before finish sends nothing."""
@@ -407,6 +408,10 @@ class RemoteLink:
         if not frames:
             return None, None
         return self._on_frame(frames[0])
+
+    def notify_status(self, payload: bytes) -> None:
+        """Queue a status payload. The next idle poll offers RS and keeps the bytes."""
+        self._pending_status = payload
 
     def finish(self, action: Action) -> bytes:
         """Cache the ACK for this sequence so a retry can resend it."""
@@ -429,4 +434,23 @@ class RemoteLink:
         if frame.command in _ANTENNA:
             self._open_sequence = frame.sequence
             return None, Action(frame.command, _ANTENNA[frame.command])
+        if frame.command is Command.HHH:
+            if self._pending_status is not None:
+                return self._reply(frame, Command.RS, b""), None
+            return self._reply(frame, Command.ACK, bytes([Command.HHH.byte])), None
+        if frame.command is Command.RR:
+            if self._pending_status is not None:
+                payload = self._pending_status
+                self._pending_status = None
+                return self._reply(frame, Command.SND, payload), None
+            return self._reply(frame, Command.ACK, bytes([Command.RR.byte])), None
+        if frame.command is Command.RCVD:
+            return self._reply(frame, Command.ACK, bytes([Command.RCVD.byte])), None
         return None, None
+
+    def _reply(self, frame: Frame, command: Command, payload: bytes) -> bytes:
+        """Send one reply on the sequence the master just used, and cache it."""
+        raw = encode_frame(Frame(2, 1, frame.sequence, command, payload))
+        self._cached = raw
+        self._cached_sequence = frame.sequence
+        return raw

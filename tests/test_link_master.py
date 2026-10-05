@@ -1,5 +1,5 @@
 from common.commands import Command
-from common.protocol import Frame, MasterLink, decode_frames, encode_frame
+from common.protocol import Frame, MasterLink, Status, decode_frames, encode_frame, pack_status
 
 
 def _ack(frame: Frame) -> bytes:
@@ -12,6 +12,35 @@ def _ack(frame: Frame) -> bytes:
             payload=bytes([frame.command.byte]),
         )
     )
+
+
+def test_master_answers_rs_with_rr():
+    link = MasterLink(poll_ms=200, reply_timeout_ms=500, reply_tries=3, miss_limit=5)
+    hhh = decode_frames(link.poll(200))[0][0]
+    link.feed(encode_frame(Frame(2, 1, hhh.sequence, Command.RS, b"")))
+    rr = decode_frames(link.poll(200))[0][0]
+    assert rr.command is Command.RR
+    reading = Status(
+        auto=True,
+        bypass=False,
+        atu_link=True,
+        test_mode=False,
+        efficiency_valid=True,
+        power_valid=True,
+        order="LC",
+        forward_w=10.0,
+        swr=1.10,
+        inductance_nh=0,
+        capacitance_pf=0,
+        efficiency_pct=90,
+        antenna=2,
+        error_code=0,
+        error_source=0,
+    )
+    link.feed(encode_frame(Frame(2, 1, rr.sequence, Command.SND, pack_status(reading))))
+    assert link.status() == reading
+    rcvd = decode_frames(link.poll(200))[0][0]
+    assert rcvd.command is Command.RCVD
 
 
 def test_idle_poll_sends_hhh():

@@ -478,7 +478,7 @@ Commit: `feat: resend the cached reply for a duplicate sequence`
 
 ### Task 14. RS, RR, SND, RCVD handshake
 
-- [ ] Files: `common/protocol.py`, `tests/test_link_remote.py`, `tests/test_link_master.py`.
+- [x] Files: `common/protocol.py`, `tests/test_link_remote.py`, `tests/test_link_master.py`.
 
 Failing test, remote side: `notify_status(payload)` then an HHH poll returns a frame whose command is RS and whose payload is empty. A following AT2 returns action antenna 2 and, after `finish`, ACK of AT2. The status is still pending. The next HHH returns RS again. An RR returns SND whose payload equals the pending bytes, and the pending flag clears. A second RR with nothing pending returns ACK of RR. An RCVD returns ACK of RCVD.
 
