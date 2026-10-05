@@ -1317,7 +1317,7 @@ Commit: `docs: describe the RS485 frame and the poll handshake`
 
 ### Task 58. ATU link document and firmware notes
 
-- [ ] Files: `docs/ATU_LINK.md`, `atu100_firmware/README.md`, `tests/test_docs_atu.py`.
+- [x] Files: `docs/ATU_LINK.md`, `atu100_firmware/README.md`, `tests/test_docs_atu.py`.
 
 Failing test: both files contain `ATU-100_remote_PIC16F1938_20260412_1157.hex` and `4800`. `docs/ATU_LINK.md` contains `efficency`, `{"x":true}`, `RelayC` bit 7, and `Forward`. `atu100_firmware/README.md` contains `MPLAB X`, `XC8`, `docker.sh`, `pk2cmd`, `// REMOTE LINK`, and a unified diff that adds `json_int("Forward", g_i_Power, sft)` in `send_state`. It says the host tests do not compile the PIC.
 
