@@ -386,7 +386,7 @@ Commit: `feat: drop an RS485 frame with a bad CRC`
 
 ### Task 08. Reject a length that does not match
 
-- [ ] Files: `common/protocol.py`, `tests/test_frame.py`.
+- [x] Files: `common/protocol.py`, `tests/test_frame.py`.
 
 Failing test: build a buffer whose length byte is 2 but only one payload byte is present before a correct CRC of a different body. `decode_frames` returns no frames. A later valid AT1 still decodes.
 
