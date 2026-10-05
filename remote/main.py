@@ -3,7 +3,7 @@
 # through a reset. The repeating task list is started from boot_devices.
 
 from common import hal
-from common.mcp23017 import MCP23017
+from common.mcp23017 import MCP23017, RelayLatch
 from common.scheduler import run_once
 from common.ssd1306 import SSD1306
 from remote import config
@@ -25,9 +25,14 @@ def boot_devices(role: str = "remote") -> RemoteApp:
         raise ValueError(role)
     app = RemoteApp()
     events: list[str] = []
-    boot_remote(app.latch, events)
-    app.boot_events = events
     _open_buses(app)
+    if getattr(app, "mcp", None) is not None:
+        app.latch = RelayLatch(app.mcp)
+    safe_off(app.latch, "boot")
+    events.append("relays_off")
+    hal.start_watchdog(config.WATCHDOG_MS)
+    events.append("watchdog")
+    app.boot_events = events
     app.tasks = build_remote_tasks(app)
     return app
 
