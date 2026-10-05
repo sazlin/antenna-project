@@ -729,7 +729,7 @@ Commit: `feat: map tuner commands onto one ukoda JSON field`
 
 ### Task 30. Parse a ukoda status object
 
-- [ ] Files: `remote/atu_link.py`, `tests/test_atu_json.py`.
+- [x] Files: `remote/atu_link.py`, `tests/test_atu_json.py`.
 
 Failing test `test_parse_multiline_send_state`: `feed` this buffer, which is the `send_state` shape from `json.c` plus the `Forward` field from assumption A12.
 
