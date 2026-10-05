@@ -400,7 +400,7 @@ Commit: `feat: drop an RS485 frame whose length does not match`
 
 ### Task 09. Status payload round trip
 
-- [ ] Files: `common/protocol.py`, `tests/test_status_payload.py`.
+- [x] Files: `common/protocol.py`, `tests/test_status_payload.py`.
 
 Failing test: `pack_status` then `unpack_status` for auto on, bypass off, atu link up, not in test, efficiency valid, power valid, order `LC`, forward 100.0, SWR 1.15, 1250 nH, 150 pF, efficiency 99, antenna 2, error 0. Flags byte equals `0b00110101`. Bit 6 is clear. Forward uint16 equals 1000. SWR uint16 equals 115. The packed length is 13. The same reading with order `CL` packs 13 bytes, sets flags bit 6, and `unpack_status` restores order `CL`. Clearing bit 6 restores order `LC`. Task 20 still stores `order` on `LinkState`. Task 30 still parses JSON `Order`. Task 37 still formats LC and CL locally.
 

@@ -2,6 +2,7 @@
 # The remote is the only board that drives antenna relays. This module
 # never touches a relay coil. It only checks bytes on the U094 link.
 
+import struct
 from dataclasses import dataclass
 
 from common.commands import CODE_TO_COMMAND, Command
@@ -10,6 +11,94 @@ START = 0x7E
 END = 0x7F
 ESCAPE = 0x7D
 _SPECIAL = (START, END, ESCAPE)
+_STATUS = struct.Struct("<BHHHHBBBB")
+_FLAG_AUTO = 0x01
+_FLAG_BYPASS = 0x02
+_FLAG_ATU = 0x04
+_FLAG_TEST = 0x08
+_FLAG_EFFICIENCY = 0x10
+_FLAG_POWER = 0x20
+_FLAG_CL = 0x40
+
+
+@dataclass(frozen=True)
+class Status:
+    """Tuner reading carried in a 13-byte SND payload."""
+
+    auto: bool
+    bypass: bool
+    atu_link: bool
+    test_mode: bool
+    efficiency_valid: bool
+    power_valid: bool
+    order: str
+    forward_w: float
+    swr: float
+    inductance_nh: int
+    capacitance_pf: int
+    efficiency_pct: int
+    antenna: int
+    error_code: int
+    error_source: int
+
+
+def _status_flags(status: Status) -> int:
+    """Pack the mode bits. Bit 6 is CL order. LC leaves that bit clear."""
+    flags = 0
+    if status.auto:
+        flags |= _FLAG_AUTO
+    if status.bypass:
+        flags |= _FLAG_BYPASS
+    if status.atu_link:
+        flags |= _FLAG_ATU
+    if status.test_mode:
+        flags |= _FLAG_TEST
+    if status.efficiency_valid:
+        flags |= _FLAG_EFFICIENCY
+    if status.power_valid:
+        flags |= _FLAG_POWER
+    if status.order == "CL":
+        flags |= _FLAG_CL
+    return flags
+
+
+def pack_status(status: Status) -> bytes:
+    """Pack watts, SWR, L, and C into the fixed 13-byte status payload."""
+    return _STATUS.pack(
+        _status_flags(status),
+        int(round(status.forward_w * 10)),
+        int(round(status.swr * 100)),
+        status.inductance_nh,
+        status.capacitance_pf,
+        status.efficiency_pct,
+        status.antenna,
+        status.error_code,
+        status.error_source,
+    )
+
+
+def unpack_status(data: bytes) -> Status:
+    """Restore a status payload. Raise ValueError when the buffer is short."""
+    if len(data) != 13:
+        raise ValueError(f"status payload is {len(data)} bytes, need 13")
+    flags, forward, swr, inductance, capacitance, efficiency, antenna, error, source = _STATUS.unpack(data)
+    return Status(
+        auto=bool(flags & _FLAG_AUTO),
+        bypass=bool(flags & _FLAG_BYPASS),
+        atu_link=bool(flags & _FLAG_ATU),
+        test_mode=bool(flags & _FLAG_TEST),
+        efficiency_valid=bool(flags & _FLAG_EFFICIENCY),
+        power_valid=bool(flags & _FLAG_POWER),
+        order="CL" if flags & _FLAG_CL else "LC",
+        forward_w=forward / 10,
+        swr=swr / 100,
+        inductance_nh=inductance,
+        capacitance_pf=capacitance,
+        efficiency_pct=efficiency,
+        antenna=antenna,
+        error_code=error,
+        error_source=source,
+    )
 
 
 @dataclass
