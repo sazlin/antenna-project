@@ -921,7 +921,7 @@ Commit: `feat: buffer four OLED lines and a menu highlight`
 
 ### Task 40. Menu navigation
 
-- [ ] Files: `common/menu.py`, `tests/test_menu.py`.
+- [x] Files: `common/menu.py`, `tests/test_menu.py`.
 
 Failing test: `Menu(MASTER_MENU)` starts on `Antenna` and is not active until `open_menu()`. After open, `down()` moves to `Tuner`, `up()` from the top wraps to `Exit Menu`, `right()` on Antenna shows `Antenna 1`, `left()` returns to Antenna, `select()` on Antenna 1 returns `at1` and `active` is false. `select()` on Exit Menu returns `exit`. `select()` on a parent does not return a handler. It enters the child, the same as right. Shutdown's select returns `f86`.
 
