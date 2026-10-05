@@ -1015,7 +1015,7 @@ Commit: `feat: buffer UART bytes in a fixed ring`
 
 ### Task 46. Apply an antenna command, then commit
 
-- [ ] Files: `remote/tasks.py`, `tests/test_apply_antenna.py`.
+- [x] Files: `remote/tasks.py`, `tests/test_apply_antenna.py`.
 
 Failing test: `apply_from_link(link_action, latch, state, power)` where the action is AT2, power is 0.2 W and fresh, state antenna is 1. After the call the latch is `0b0010`, `state.antenna` is 2, `state.previous.antenna` is 1, and the returned reply kind is `ack`. A second call with forward 5.0 W fresh returns kind `err` and code `HOT_SWITCH`, and the latch stays `0b0010`. `state.antenna` stays 2.
 
