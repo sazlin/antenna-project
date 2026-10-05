@@ -6,6 +6,7 @@ import json
 from dataclasses import dataclass
 
 from common.commands import Command
+from common.errors import ErrorCode
 
 _OUTBOUND = {
     Command.AM0: b'{"Auto":true}\n',
@@ -99,16 +100,22 @@ class AtuLink:
         """Hold the UART stand-in and an incomplete JSON buffer."""
         self.port = bytearray() if port is None else port
         self._rx = ""
+        self.busy = False
 
-    def feed(self, data: bytes) -> TunerStatus | None:
-        """Append bytes. Return one status when the braces balance."""
+    def feed(self, data: bytes) -> TunerStatus | ErrorCode | None:
+        """Append bytes. A finished object that is not JSON is data corrupted."""
         self._rx += data.decode("utf-8")
         end = _balanced_end(self._rx)
         if end is None:
             return None
         piece = self._rx[:end]
         self._rx = self._rx[end:]
-        obj = json.loads(piece)
+        try:
+            obj = json.loads(piece)
+        except json.JSONDecodeError:
+            self.busy = False
+            return ErrorCode.DATA_CORRUPTED
+        self.busy = False
         return _status_from_object(obj)
 
 

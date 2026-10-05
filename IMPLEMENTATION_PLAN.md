@@ -765,7 +765,7 @@ Commit: `feat: parse multiline ukoda status and the Forward field`
 
 ### Task 31. Malformed JSON does not raise
 
-- [ ] Files: `remote/atu_link.py`, `tests/test_atu_json.py`.
+- [x] Files: `remote/atu_link.py`, `tests/test_atu_json.py`.
 
 Failing test: `AtuLink` with a fake port. `feed(b'{"Forward":}\n')` returns `ErrorCode.DATA_CORRUPTED` and does not raise. The braces balance, so this is not the partial-object case from task 30. The next fed object `b'{"Forward":1.0}\n'` still parses as forward 1.0 W.
 

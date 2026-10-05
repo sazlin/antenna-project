@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from common.commands import Command
+from common.errors import ErrorCode
 from remote.atu_link import AtuLink, encode_command
 
 _MULTILINE = """\
@@ -16,6 +17,13 @@ _MULTILINE = """\
   "Inductance": 1250
 }
 """.encode()
+
+
+def test_broken_json_is_data_corrupted():
+    link = AtuLink(port=bytearray())
+    assert link.feed(b'{"Forward":}\n') is ErrorCode.DATA_CORRUPTED
+    status = link.feed(b'{"Forward":1.0}\n')
+    assert status.forward_w == 1.0
 
 
 def test_parse_multiline_send_state():
