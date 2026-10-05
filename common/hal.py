@@ -1,0 +1,68 @@
+# Hardware edge for the master and the remote Picos.
+# The host tests run on CPython, which has no machine module, so this import
+# is caught and machine stays None. UART interrupt handlers may only call
+# note_rx_byte. They must not decode frames.
+
+try:
+    import machine
+except ImportError:
+    machine = None
+
+
+class Flags:
+    """Flags an interrupt may set. The loop clears them after it drains the data."""
+
+    def __init__(self) -> None:
+        """Start with no UART byte and no expander interrupt waiting."""
+        self.rx_pending = False
+        self.mcp = False
+
+
+class ByteRing:
+    """Fixed bytearray ring. A full push drops the oldest byte and sets overflow."""
+
+    def __init__(self, size: int) -> None:
+        """Allocate the storage once. Push and pop do not replace it."""
+        self.storage = bytearray(size)
+        self._head = 0
+        self._tail = 0
+        self._count = 0
+        self.overflow = False
+
+    def push(self, value: int) -> None:
+        """Store one byte. When the ring is full, the oldest byte is discarded."""
+        size = len(self.storage)
+        if self._count == size:
+            self.overflow = True
+            self._tail = (self._tail + 1) % size
+            self._count -= 1
+        self.storage[self._head] = value
+        self._head = (self._head + 1) % size
+        self._count += 1
+
+    def pop(self) -> int | None:
+        """Return the oldest byte, or None when the ring is empty."""
+        if self._count == 0:
+            return None
+        value = self.storage[self._tail]
+        self._tail = (self._tail + 1) % len(self.storage)
+        self._count -= 1
+        return value
+
+
+def note_rx_byte(ring: ByteRing, flags: Flags, value: int) -> None:
+    """Store one UART byte and raise the flag. This is the interrupt path."""
+    ring.push(value)
+    flags.rx_pending = True
+
+
+def drain_rx(ring: ByteRing, flags: Flags) -> bytes:
+    """Take every stored byte and clear the receive flag."""
+    out = bytearray()
+    while True:
+        value = ring.pop()
+        if value is None:
+            break
+        out.append(value)
+    flags.rx_pending = False
+    return bytes(out)

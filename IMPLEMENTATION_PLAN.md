@@ -999,7 +999,7 @@ Commit: `feat: run cooperative tasks and an interrupt pass`
 
 ### Task 45. Fixed RX ring
 
-- [ ] Files: `common/hal.py`, `tests/test_ring.py`.
+- [x] Files: `common/hal.py`, `tests/test_ring.py`.
 
 Failing test: `ByteRing(8)`. Push 1, 2, 3. Pop returns them in order. Push 8 bytes into an empty ring, then one more. `overflow` is true and the oldest byte is gone. `push` of a single int does not allocate a `list` or `bytes` that the test can see: the storage attribute is a `bytearray` of length 8 before and after overflow. Importing `common.hal` leaves `sys.modules` without `machine`. `note_rx_byte(ring, flags, 0x41)` appends `0x41` and sets `flags.rx_pending`. It does not call `decode_frames`. `drain_rx(ring, flags)` returns the stored bytes and clears `flags.rx_pending`.
 
