@@ -8,6 +8,23 @@ try:
 except ImportError:
     machine = None
 
+watchdog_ms: int | None = None
+
+
+def bind(module: object) -> None:
+    """Install a fake machine for a host test. The real import stays in this file."""
+    global machine
+    machine = module
+
+
+def start_watchdog(timeout_ms: int) -> None:
+    """Arm the hardware watchdog. On the host, machine is None, so this only records the request."""
+    global watchdog_ms
+    watchdog_ms = timeout_ms
+    if machine is None:
+        return
+    machine.WDT(timeout=timeout_ms)
+
 
 class Flags:
     """Flags an interrupt may set. The loop clears them after it drains the data."""

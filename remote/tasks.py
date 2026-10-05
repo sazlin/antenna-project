@@ -6,9 +6,11 @@ from dataclasses import dataclass
 from common.commands import Command
 from common.display import publish
 from common.errors import ErrorCode, RelayFault
+from common.hal import ByteRing, Flags, drain_rx
 from common.menu import Menu
-from common.protocol import Action, Status, pack_status
+from common.protocol import Action, RemoteLink, Status, pack_status
 from common.state import LinkState, commit
+from remote import config
 from remote.atu_link import AtuLink, TestMode, encode_command
 from remote.button_emulation import Fallback, OptoBank
 from remote.relays import apply_antenna_command, safe_off
@@ -46,10 +48,10 @@ def apply_from_link(action: Action, latch: object, state: LinkState, power: Powe
             now_ms=power.now_ms,
             forward_w=power.forward_w,
             sample_ms=power.sample_ms,
-            threshold_w=1.0,
-            enabled=True,
-            stale_ms=1000,
-            delay_ms=100,
+            threshold_w=config.HOT_SWITCH_WATTS,
+            enabled=config.HOT_SWITCH_ENABLED,
+            stale_ms=config.POWER_STALE_MS,
+            delay_ms=config.RELAY_DELAY_MS,
             sleep=_sleep,
         )
     except RelayFault:
@@ -251,6 +253,153 @@ def on_link_lost(state: LinkState, latch: object) -> None:
     del latch
     state.banner = "Communication Lost"
     state.link_up = False
+
+
+class MemoryLatch:
+    """Relay latch used by the host loop. The MCP driver replaces it on the Pico."""
+
+    def __init__(self, value: int = 0) -> None:
+        """Start from the given coil mask."""
+        self.value = value
+        self.writes: list[int] = []
+
+    def write(self, value: int) -> None:
+        """Record the coil mask."""
+        self.writes.append(value)
+        self.value = value
+
+    def read(self) -> int:
+        """Return the last mask."""
+        return self.value
+
+
+class _Olat:
+    """Port bytes for the LED helper."""
+
+    def __init__(self) -> None:
+        """Start dark."""
+        self.port_a = 0
+        self.port_b = 0
+
+
+class _Panel:
+    """Remember the last four lines."""
+
+    def __init__(self) -> None:
+        """No lines yet."""
+        self.lines = None
+
+    def show_lines(self, lines: tuple[str, str, str, str]) -> None:
+        """Store the lines publish just built."""
+        self.lines = lines
+
+
+class RemoteApp:
+    """The remote pieces one superloop pass closes over."""
+
+    def __init__(self) -> None:
+        """Build rings, the tuner link, and a fresh antenna state."""
+        self.link = RemoteLink()
+        self.link.execute_tuner = True
+        self.rs485 = ByteRing(64)
+        self.rs485_flags = Flags()
+        self.atu_ring = ByteRing(256)
+        self.atu_flags = Flags()
+        self.tx = bytearray()
+        self.latch = MemoryLatch()
+        self.state = LinkState()
+        self.port_writes: list[bytes] = []
+        self.atu = AtuLink(
+            self,
+            timeout_ms=config.ATU_TIMEOUT_MS,
+            tries=config.ATU_TRIES,
+            tune_timeout_ms=config.TUNE_TIMEOUT_MS,
+        )
+        self.test_mode = TestMode(config.INDUCTOR_COUNT, config.CAPACITOR_COUNT)
+        self.fallback = Fallback()
+        self.opto = OptoBank()
+        self.mode = config.ATU_MODE
+        self.now_ms = 0
+        self.last_accept_ms = 0
+        self.power = PowerView(0.0, 0, 0)
+        self.presses: list[str] = []
+        self.events: list[str] = []
+        self.atu_polls = 0
+        self.publishes = 0
+        self.feeds = 0
+        self.mcp_flag = Flags()
+        self.shared: dict[str, float | None] = {}
+        self.panel = _Panel()
+        self.olat = _Olat()
+
+    def write(self, data: bytes) -> None:
+        """AtuLink uses this as the UART write."""
+        self.port_writes.append(data)
+
+
+def _remote_drain(app: RemoteApp) -> None:
+    """Accept a master frame, or call link loss when the master has been quiet."""
+    if app.now_ms - app.last_accept_ms >= config.REMOTE_SILENCE_MS and app.state.link_up:
+        on_link_lost(app.state, app.latch)
+    data = drain_rx(app.rs485, app.rs485_flags)
+    if not data:
+        return
+    power = PowerView(app.power.forward_w, app.power.sample_ms, app.now_ms)
+    reply = dispatch_frame(
+        data,
+        link=app.link,
+        latch=app.latch,
+        state=app.state,
+        power=power,
+        port=app,
+        mode=app.mode,
+        test_mode=app.test_mode,
+        fallback=app.fallback,
+        opto=app.opto,
+    )
+    app.last_accept_ms = app.now_ms
+    app.state.link_up = True
+    app.state.banner = ""
+    if reply:
+        app.tx.extend(reply)
+
+
+def _remote_poll_atu(app: RemoteApp) -> None:
+    """Drain the tuner ring and commit one status. The interrupt does not parse JSON."""
+    app.atu_polls += 1
+    data = drain_rx(app.atu_ring, app.atu_flags)
+    if data:
+        app.atu.feed(data)
+    poll_atu(app.atu, app.state, app.link, app.now_ms)
+    app.shared["antenna_w"] = app.state.antenna_w
+
+
+def _remote_optos(app: RemoteApp) -> None:
+    """Drop a fallback opto bit when its press time has elapsed."""
+    app.opto.service_optos(app.now_ms)
+
+
+def _remote_publish(app: RemoteApp) -> None:
+    """Draw the screen and the two remote LEDs."""
+    app.publishes += 1
+    publish_display(app.state, app.panel, app.olat)
+
+
+def _remote_buttons(app: RemoteApp) -> None:
+    """Turn one debounced press into one sampled event."""
+    if app.presses:
+        app.events.append(app.presses.pop(0))
+
+
+def build_remote_tasks(app: RemoteApp) -> list:
+    """The remote pass, in order. run_once does not copy this list."""
+    return [
+        lambda: _remote_drain(app),
+        lambda: _remote_poll_atu(app),
+        lambda: _remote_optos(app),
+        lambda: _remote_publish(app),
+        lambda: _remote_buttons(app),
+    ]
 
 
 def apply_menu(

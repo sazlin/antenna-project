@@ -1186,7 +1186,7 @@ Commit: `feat: map master and remote buttons onto commands`
 
 ### Task 64. Remote and master superloop
 
-- [ ] Files: `remote/main.py`, `master/main.py`, `remote/tasks.py`, `master/tasks.py`, `common/hal.py`, `tests/test_main_loop.py`, `tests/test_wiring.py`, `tests/test_fallback.py`.
+- [x] Files: `remote/main.py`, `master/main.py`, `remote/tasks.py`, `master/tasks.py`, `common/hal.py`, `tests/test_main_loop.py`, `tests/test_wiring.py`, `tests/test_fallback.py`.
 
 Task 44's `run_once`, task 45's ring, task 47's banner split, task 48's four-line tuple, task 10's idle timing and sequence wrap, and task 52's relays-off-before-watchdog order stay as those tests describe them. This task adds the lists, the buses, and the `main` call.
 
