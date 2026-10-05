@@ -7,6 +7,23 @@ def _frame(command: Command, sequence: int, payload: bytes = b"") -> bytes:
     return encode_frame(Frame(1, 2, sequence, command, payload))
 
 
+def test_f86_rejects_later_antenna_commands():
+    link = RemoteLink()
+    _reply, action = link.on_bytes(_frame(Command.F86, 1))
+    assert action == Action(Command.F86, None)
+    ack, _leftover = decode_frames(link.finish(action))
+    assert ack[0].payload == bytes([0x35])
+    reply, action = link.on_bytes(_frame(Command.AT1, 2))
+    assert action is None
+    frames, _leftover = decode_frames(reply)
+    assert frames[0].command is Command.ERR
+    assert frames[0].payload[0] == ErrorCode.FAILED_TO_EXECUTE
+    assert link.shutdown is True
+    _reply, action = link.on_bytes(_frame(Command.RST, 3))
+    assert action == Action(Command.RST, None)
+    assert link.shutdown is False
+
+
 def test_boot_and_rst_send_ready():
     link = RemoteLink()
     reply, action = link.on_bytes(_frame(Command.HHH, 1))

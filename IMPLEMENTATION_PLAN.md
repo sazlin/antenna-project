@@ -544,7 +544,7 @@ Commit: `feat: send RST RDY at boot and after RST`
 
 ### Task 18. F86 shuts the command path
 
-- [ ] Files: `common/protocol.py`, `tests/test_link_remote.py`.
+- [x] Files: `common/protocol.py`, `tests/test_link_remote.py`.
 
 Failing test: F86 returns action `Command.F86`. After `finish`, ACK payload is `0x35`. A later AT1 returns action None and an ERR frame whose first payload byte is `FAILED_TO_EXECUTE`. `shutdown` stays true until RST, which clears it and returns action RST.
 
