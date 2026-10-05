@@ -1345,7 +1345,7 @@ Commit: `docs: explain how to flash the Picos and the ATU-100`
 
 ### Task 60. Bench test plan
 
-- [ ] Files: `docs/TEST_PLAN.md`, `tests/test_docs_bench.py`.
+- [x] Files: `docs/TEST_PLAN.md`, `tests/test_docs_bench.py`.
 
 Failing test: the doc has three ordered headings `No RF`, `Dummy load`, and `Antennas`. The No RF section says all relays off at power-up and forbids a wattmeter reading requirement. The Dummy load section says low power and a dummy load before any antenna. The Antennas section says one relay at a time and a power above 1 W must be refused.
 
