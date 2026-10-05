@@ -12,12 +12,27 @@ except ImportError:
 
 watchdog_ms: int | None = None
 _host_ticks_ms = 0
+_sleep_hook = lambda _delay_ms: None
 
 
 def set_host_ticks_ms(now_ms: int) -> None:
     """Set the host clock. The Pico reads time.ticks_ms instead."""
     global _host_ticks_ms
     _host_ticks_ms = now_ms
+
+
+def set_sleep_hook(hook: object) -> None:
+    """Replace the host delay. The Pico calls time.sleep_ms and ignores the hook."""
+    global _sleep_hook
+    _sleep_hook = hook
+
+
+def sleep_ms(delay_ms: int) -> None:
+    """Wait for a relay coil to release. The host hook defaults to a no-op."""
+    if machine is not None and hasattr(time, "sleep_ms"):
+        time.sleep_ms(delay_ms)
+        return
+    _sleep_hook(delay_ms)
 
 
 def ticks_ms() -> int:

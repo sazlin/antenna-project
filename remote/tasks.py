@@ -3,6 +3,7 @@
 
 from dataclasses import dataclass
 
+from common import hal
 from common.commands import Command
 from common.display import publish
 from common.errors import ErrorCode, RelayFault
@@ -33,8 +34,9 @@ class ApplyReply:
     code: ErrorCode | None = None
 
 
-def _sleep(_delay_ms: int) -> None:
-    """The host test must not wait out the relay flyback."""
+def _sleep(delay_ms: int) -> None:
+    """Hold the coil open for the break-before-make delay. The host hook does not wait."""
+    hal.sleep_ms(delay_ms)
 
 
 def apply_from_link(action: Action, latch: object, state: LinkState, power: PowerView) -> ApplyReply:

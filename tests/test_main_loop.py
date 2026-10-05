@@ -16,6 +16,39 @@ def _run(tasks, feeds: list[int]) -> None:
     run_once(tasks, interrupt=lambda: None, watchdog=lambda: feeds.append(1))
 
 
+def test_live_antenna_change_waits_relay_delay_ms():
+    import pytest
+
+    from common import hal
+    from common.errors import RelayFault
+    from remote.relays import set_antenna
+
+    slept: list[int] = []
+    hal.set_sleep_hook(slept.append)
+    try:
+        app = RemoteApp()
+        _load(app.rs485, app.rs485_flags, encode_frame(Frame(1, 2, 1, Command.AT2, b"")))
+        _run(build_remote_tasks(app), [])
+        assert slept == [100]
+        slept.clear()
+        _load(app.rs485, app.rs485_flags, encode_frame(Frame(1, 2, 2, Command.AT2, b"")))
+        _run(build_remote_tasks(app), [])
+        assert slept == []
+
+        class TwoBit:
+            def read(self) -> int:
+                return 0b0101
+
+            def write(self, value: int) -> None:
+                self.value = value
+
+        with pytest.raises(RelayFault):
+            set_antenna(TwoBit(), 3, delay_ms=100, sleep=hal.sleep_ms)
+        assert slept == []
+    finally:
+        hal.set_sleep_hook(lambda _delay_ms: None)
+
+
 def _forward_status(watts: float) -> bytes:
     return (
         "{\n"
