@@ -660,7 +660,7 @@ Commit: `feat: leave the selected antenna relay closed`
 
 ### Task 26. Hot-switch refusal
 
-- [ ] Files: `remote/relays.py`, `tests/test_relays.py`.
+- [x] Files: `remote/relays.py`, `tests/test_relays.py`.
 
 Failing test: state antenna 1, latch `0b0001`, `forward_w=1.1`, `sample_ms=0`, `now_ms=500`, threshold 1.0, enabled True, stale 1000. `apply_antenna_command` for target 2 returns `ErrorCode.HOT_SWITCH` and writes nothing. The same call for target 0 also returns `ErrorCode.HOT_SWITCH` and writes nothing.
 

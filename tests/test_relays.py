@@ -1,6 +1,6 @@
 import pytest
 
-from common.errors import RelayFault
+from common.errors import ErrorCode, RelayFault
 from common.state import LinkState
 from remote.relays import apply_antenna_command, set_antenna
 
@@ -27,6 +27,27 @@ class MismatchLatch(FakeLatch):
         if self.writes and self.writes[-1] == 0b0001:
             return 0b0011
         return self.value
+
+
+def test_power_above_one_watt_blocks_antenna_change():
+    state = LinkState(antenna=1)
+    latch = FakeLatch(0b0001)
+    for target in (2, 0):
+        result = apply_antenna_command(
+            latch,
+            state,
+            target=target,
+            now_ms=500,
+            forward_w=1.1,
+            sample_ms=0,
+            threshold_w=1.0,
+            enabled=True,
+            stale_ms=1000,
+            delay_ms=100,
+            sleep=lambda _ms: None,
+        )
+        assert result is ErrorCode.HOT_SWITCH
+        assert latch.writes == []
 
 
 def test_same_antenna_does_not_cycle():
