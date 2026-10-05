@@ -441,8 +441,10 @@ class RemoteLink:
                 return self._unavailable(frame), None
             command, payload = cached
             return self._reply(frame, command, payload), None
-        if frame.command is Command.STA and self._pending_status is None:
-            return self._unavailable(frame), None
+        if frame.command is Command.STA:
+            if self._pending_status is None:
+                return self._unavailable(frame), None
+            return self._reply(frame, Command.SND, self._pending_status), None
         if frame.command is Command.HHH:
             if self._pending_status is not None:
                 return self._reply(frame, Command.RS, b""), None

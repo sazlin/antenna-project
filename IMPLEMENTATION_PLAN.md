@@ -516,7 +516,7 @@ Commit: `feat: answer RPT with the previous reply`
 
 ### Task 16. STA is a direct status reply
 
-- [ ] Files: `common/protocol.py`, `tests/test_link_remote.py`.
+- [x] Files: `common/protocol.py`, `tests/test_link_remote.py`.
 
 Failing test: with a status payload queued, a STA frame returns SND with that payload and action None. It does not return RS.
 

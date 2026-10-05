@@ -7,6 +7,18 @@ def _frame(command: Command, sequence: int, payload: bytes = b"") -> bytes:
     return encode_frame(Frame(1, 2, sequence, command, payload))
 
 
+def test_sta_replies_with_snd():
+    link = RemoteLink()
+    payload = bytes(range(13))
+    link.notify_status(payload)
+    reply, action = link.on_bytes(_frame(Command.STA, 9))
+    assert action is None
+    frames, _leftover = decode_frames(reply)
+    assert frames[0].command is Command.SND
+    assert frames[0].payload == payload
+    assert frames[0].command is not Command.RS
+
+
 def test_rpt_resends_previous_ack():
     link = RemoteLink()
     _reply, action = link.on_bytes(_frame(Command.AT3, 4))
