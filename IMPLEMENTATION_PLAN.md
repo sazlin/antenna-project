@@ -983,7 +983,7 @@ Commit: `feat: propagate errors with a source and a nature`
 
 ### Task 44. Cooperative scheduler
 
-- [ ] Files: `common/scheduler.py`, `tests/test_scheduler.py`.
+- [x] Files: `common/scheduler.py`, `tests/test_scheduler.py`.
 
 Failing test: three tasks append their names. `run_once(tasks, interrupt=isr, watchdog=feed)` calls the interrupt task four times, each user task once, and `feed` once. A task that raises `RuntimeError` is caught, appended to `errors`, and the later tasks still run. A task that raises `RelayFault` is re-raised after the error is recorded. `run_once` does not call `time.sleep`.
 
