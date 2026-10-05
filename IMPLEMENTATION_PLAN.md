@@ -1062,7 +1062,7 @@ Commit: `feat: dispatch antenna, tuner, and menu commands`
 
 ### Task 47. Link loss does not move relays
 
-- [ ] Files: `remote/tasks.py`, `master/tasks.py`, `tests/test_link_loss.py`.
+- [x] Files: `remote/tasks.py`, `master/tasks.py`, `tests/test_link_loss.py`.
 
 Failing test: remote latch is antenna 3. `on_link_lost(remote_state, latch)` sets `remote_state.banner` to `Communication Lost`, leaves `remote_state.antenna` at 3, and does not write the latch. Master `on_link_lost(master_state)` sets the same banner and does not grow a list of outbound antenna commands.
 
@@ -1150,7 +1150,7 @@ Commit: `feat: draw tuner text on an SSD1306`
 
 ### Task 52. Boot order and import boundary
 
-- [ ] Files: `remote/main.py`, `master/main.py`, `common/hal.py`, `tests/test_boot.py`, `tests/test_imports.py`.
+- [x] Files: `remote/main.py`, `master/main.py`, `common/hal.py`, `tests/test_boot.py`, `tests/test_imports.py`.
 
 Failing test: `boot_remote(latch, events)` appends `relays_off` before `watchdog`. `events == ["relays_off", "watchdog"]`. `boot_master(events)` appends only `watchdog`. Importing `master.main`, `remote.main`, `master.tasks`, `remote.tasks`, `remote.relays`, and `remote.atu_link` does not put `machine` in `sys.modules`. A source scan of every `.py` file under `common/`, `master/`, and `remote/` finds `import machine` only in `common/hal.py`. Neither tree's source contains `import remote` inside `master/` or `import master` inside `remote/`.
 
