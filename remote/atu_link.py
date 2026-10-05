@@ -157,26 +157,36 @@ class AtuLink:
         self._attempt += 1
 
     def feed(self, data: bytes) -> TunerStatus | ErrorCode | None:
-        """Append bytes. A finished object that is not JSON is data corrupted."""
+        """Append bytes and take every complete object. A partial tail stays buffered."""
         self._rx += data.decode("utf-8")
-        end = _balanced_end(self._rx)
-        if end is None:
-            return None
-        piece = self._rx[:end]
-        self._rx = self._rx[end:]
-        try:
-            obj = json.loads(piece)
-        except json.JSONDecodeError:
+        found: TunerStatus | None = None
+        broken = False
+        while True:
+            end = _balanced_end(self._rx)
+            if end is None:
+                break
+            piece = self._rx[:end]
+            self._rx = self._rx[end:]
+            try:
+                obj = json.loads(piece)
+            except json.JSONDecodeError:
+                self.busy = False
+                self._attempt = 0
+                broken = True
+                continue
             self.busy = False
             self._attempt = 0
-            return ErrorCode.DATA_CORRUPTED
-        self.busy = False
-        self._attempt = 0
-        status = _status_from_object(obj)
-        if status is not None:
+            status = _status_from_object(obj)
+            if status is None:
+                continue
             self.last_status = status
             self._announced = False
-        return status
+            found = status
+        if found is not None:
+            return found
+        if broken:
+            return ErrorCode.DATA_CORRUPTED
+        return None
 
 
 class TestMode:

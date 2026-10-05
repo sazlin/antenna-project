@@ -148,6 +148,18 @@ def test_parse_multiline_send_state():
     assert status.order == "LC"
 
 
+def test_event_and_send_state_in_one_read_commits_forward():
+    link = AtuLink()
+    blob = b'{\n  "Event": "Tune"\n}\n' + _MULTILINE.replace(b'"Forward": 100.0', b'"Forward": 10.0').replace(
+        b'"Power": 99.0', b'"Power": 9.0'
+    )
+    status = link.feed(blob)
+    assert status.forward_w == 10.0
+    assert status.antenna_w == 9.0
+    assert link.last_status.forward_w == 10.0
+    assert link._announced is False
+
+
 def test_event_object_is_ignored():
     link = AtuLink()
     assert link.feed(b'{\n  "Event": "Tune"\n}\n') is None
