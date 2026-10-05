@@ -1094,7 +1094,7 @@ Commit: `feat: simulate a master, a remote, and a ukoda tuner`
 
 ### Task 49. Config pins and tunables
 
-- [ ] Files: `master/config.py`, `remote/config.py`, `tests/test_config.py`.
+- [x] Files: `master/config.py`, `remote/config.py`, `tests/test_config.py`.
 
 Failing test: import both configs. The shared names `I2C_SDA`, `I2C_SCL`, `RS485_TX`, `RS485_RX`, `RS485_BAUD`, `ATU_TX`, `ATU_RX`, `ATU_BAUD`, `MCP_INTA`, `MCP_INTB`, `OLED_ADDR`, `MCP23017_ADDR` are equal across the two modules. The set of GPIO integers in both modules does not include 23, 24, 25, or 29. `remote.config.RELAY_DELAY_MS == 100`, `HOT_SWITCH_WATTS == 1.0`, `HOT_SWITCH_ENABLED is True`, `POLL_MS == 200`, `ATU_BAUD == 4800`, `RS485_BAUD == 115200`, `ATU_MODE == "serial"`. Also require `REPLY_TIMEOUT_MS == 500`, `REPLY_TRIES == 3`, `MISS_LIMIT == 5`, `ATU_TIMEOUT_MS == 500`, `ATU_TRIES == 3`, `TUNE_TIMEOUT_MS == 30000`, `POWER_STALE_MS == 1000`, `INDUCTOR_COUNT == 7`, `CAPACITOR_COUNT == 7`, `WATCHDOG_MS == 3000`, and `remote.config.REMOTE_SILENCE_MS == 2000`. Master button names equal the decision 5 list. Remote button names equal the decision 6 list. OLED address is `0x3C` and MCP address is `0x20`. These names are here because task 64 reads them and must not copy the numbers as literals. `REMOTE_SILENCE_MS` is assumption A3.
 
