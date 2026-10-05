@@ -38,6 +38,29 @@ def _snapshot(state: LinkState) -> LinkState:
     return LinkState(**values)
 
 
+def _image(state: LinkState) -> dict[str, int]:
+    """Return the hardware fields a caller may write back after a rollback."""
+    return {
+        "antenna": state.antenna,
+        "relay_mask": state.relay_mask,
+        "led_bits": state.led_bits,
+        "button_mask": state.button_mask,
+    }
+
+
+def rollback(state: LinkState) -> dict[str, int]:
+    """Restore the saved row. A second call with nothing older returns that image."""
+    previous = state.previous
+    if previous is None:
+        return _image(state)
+    for item in fields(state):
+        if item.name == "previous":
+            continue
+        setattr(state, item.name, getattr(previous, item.name))
+    state.previous = None
+    return _image(state)
+
+
 def commit(state: LinkState, **changes: object) -> None:
     """Save the current row, then apply the named changes to it."""
     state.previous = _snapshot(state)

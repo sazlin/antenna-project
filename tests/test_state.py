@@ -1,4 +1,21 @@
-from common.state import LinkState, commit
+from common.state import LinkState, commit, rollback
+
+
+def test_rollback_returns_the_previous_antenna():
+    state = LinkState()
+    commit(state, antenna=1, relay_mask=0b0001, led_bits=0b0010, button_mask=0b1000)
+    commit(state, antenna=3, relay_mask=0b0100)
+    image = rollback(state)
+    assert state.antenna == 1
+    assert image == {
+        "antenna": 1,
+        "relay_mask": 0b0001,
+        "led_bits": 0b0010,
+        "button_mask": 0b1000,
+    }
+    again = rollback(state)
+    assert state.antenna == 1
+    assert again == image
 
 
 def test_commit_keeps_an_independent_previous():

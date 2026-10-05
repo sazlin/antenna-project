@@ -590,7 +590,7 @@ Commit: `feat: save the previous state before a commit`
 
 ### Task 21. Rollback restores the previous hardware image
 
-- [ ] Files: `common/state.py`, `tests/test_state.py`.
+- [x] Files: `common/state.py`, `tests/test_state.py`.
 
 Failing test: commit antenna 1, `relay_mask=0b0001`, `led_bits=0b0010`, `button_mask=0b1000`, then commit antenna 3 and `relay_mask=0b0100`. `rollback(state)` sets antenna back to 1 and returns a dict with `antenna` 1, `relay_mask` `0b0001`, `led_bits` `0b0010`, and `button_mask` `0b1000`. A second rollback with no older snapshot leaves antenna 1 and returns that same image. It does not raise. A normal caller may reapply that dict, including a nonzero `relay_mask`. `RelayFault` does not. Task 46 leaves the latch at 0 and does not write this dict's `relay_mask` after a coil fault.
 
