@@ -674,7 +674,7 @@ Commit: `feat: refuse an antenna change above the forward power threshold`
 
 ### Task 27. Hot-switch allows the boundary and a stale sample
 
-- [ ] Files: `remote/relays.py`, `tests/test_relays.py`.
+- [x] Files: `remote/relays.py`, `tests/test_relays.py`.
 
 Failing test, three cases in one test function is too many. Write three tests in this task:
 

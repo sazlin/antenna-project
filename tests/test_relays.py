@@ -29,6 +29,60 @@ class MismatchLatch(FakeLatch):
         return self.value
 
 
+def _change(latch: FakeLatch, state: LinkState, **kwargs: object) -> ErrorCode | None:
+    values = {
+        "now_ms": 0,
+        "forward_w": 0.0,
+        "sample_ms": 0,
+        "threshold_w": 1.0,
+        "enabled": True,
+        "stale_ms": 1000,
+        "delay_ms": 100,
+        "sleep": lambda _ms: None,
+    }
+    values.update(kwargs)
+    return apply_antenna_command(latch, state, **values)
+
+
+def test_one_watt_is_allowed():
+    state = LinkState(antenna=1)
+    latch = FakeLatch(0b0001)
+    assert _change(latch, state, target=2, forward_w=1.0, sample_ms=0, now_ms=0) is None
+    assert latch.read() == 0b0010
+
+
+def test_disabled_interlock_allows_high_power():
+    state = LinkState(antenna=1)
+    latch = FakeLatch(0b0001)
+    result = _change(latch, state, target=3, forward_w=50.0, enabled=False, sample_ms=0, now_ms=0)
+    assert result is None
+    assert latch.read() == 0b0100
+
+
+def test_stale_power_does_not_block():
+    state = LinkState(antenna=1)
+    latch = FakeLatch(0b0001)
+    result = _change(
+        latch,
+        state,
+        target=4,
+        forward_w=25.0,
+        sample_ms=0,
+        now_ms=1000,
+        stale_ms=1000,
+    )
+    assert result is None
+    assert latch.read() == 0b1000
+
+
+def test_missing_power_does_not_block():
+    state = LinkState(antenna=1)
+    latch = FakeLatch(0b0001)
+    result = _change(latch, state, target=2, forward_w=None, enabled=True, sample_ms=10, now_ms=10)
+    assert result is None
+    assert latch.read() == 0b0010
+
+
 def test_power_above_one_watt_blocks_antenna_change():
     state = LinkState(antenna=1)
     latch = FakeLatch(0b0001)

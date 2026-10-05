@@ -26,9 +26,9 @@ def apply_antenna_command(
     bit = 0 if target == 0 else 1 << (target - 1)
     if state.antenna == target and latch.read() == bit:
         return None
-    if forward_w is not None and forward_w > threshold_w:
+    fresh = forward_w is not None and now_ms - sample_ms < stale_ms
+    if enabled and fresh and forward_w > threshold_w:
         return ErrorCode.HOT_SWITCH
-    del now_ms, sample_ms, enabled, stale_ms
     set_antenna(latch, target, delay_ms, sleep)
     return None
 
