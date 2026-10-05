@@ -841,7 +841,7 @@ Commit: `feat: emulate Tune, Auto, and Bypass with stock press times`
 
 ### Task 35. Power and SWR text
 
-- [ ] Files: `common/display.py`, `tests/test_display_format.py`.
+- [x] Files: `common/display.py`, `tests/test_display_format.py`.
 
 Failing test: `format_power(100) == "100.0W"`, `format_power(5) == "5.0W"`, `format_power(0.1) == "0.1W"`. `format_swr(1.15) == "1.15"`, `format_swr(1) == "1.00"`.
 
