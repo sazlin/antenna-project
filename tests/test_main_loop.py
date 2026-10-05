@@ -16,6 +16,26 @@ def _run(tasks, feeds: list[int]) -> None:
     run_once(tasks, interrupt=lambda: None, watchdog=lambda: feeds.append(1))
 
 
+def test_master_pass_polls_when_the_clock_reaches_poll_ms():
+    from common import hal
+    from master.main import run_production_pass
+
+    app = MasterApp()
+    app.tasks = build_master_tasks(app)
+    hal.set_host_ticks_ms(0)
+    try:
+        run_production_pass(app)
+        assert app.tx == b""
+        hal.set_host_ticks_ms(200)
+        run_production_pass(app)
+        frames, leftover = decode_frames(bytes(app.tx))
+        assert leftover == b""
+        assert frames[0].command is Command.HHH
+        assert frames[0].sequence != 0
+    finally:
+        hal.set_host_ticks_ms(0)
+
+
 def test_remote_run_once_drains_and_feeds():
     app = RemoteApp()
     app.power = PowerView(0.2, 0, 0)

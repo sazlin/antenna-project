@@ -3,12 +3,28 @@
 # is caught and machine stays None. UART interrupt handlers may only call
 # note_rx_byte. They must not decode frames.
 
+import time
+
 try:
     import machine
 except ImportError:
     machine = None
 
 watchdog_ms: int | None = None
+_host_ticks_ms = 0
+
+
+def set_host_ticks_ms(now_ms: int) -> None:
+    """Set the host clock. The Pico reads time.ticks_ms instead."""
+    global _host_ticks_ms
+    _host_ticks_ms = now_ms
+
+
+def ticks_ms() -> int:
+    """Milliseconds since boot. Tasks that tests drive keep the assigned now_ms."""
+    if machine is not None:
+        return time.ticks_ms()
+    return _host_ticks_ms
 
 
 def bind(module: object) -> None:

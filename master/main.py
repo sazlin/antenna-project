@@ -55,7 +55,13 @@ def _interrupt(app: MasterApp) -> None:
     del app
 
 
+def run_production_pass(board: MasterApp) -> None:
+    """Read the clock once, then run the task list. Tests that set now_ms call run_once."""
+    board.now_ms = hal.ticks_ms()
+    run_once(board.tasks, interrupt=lambda: _interrupt(board), watchdog=lambda: None)
+
+
 if __name__ == "__main__":
     board = boot_devices("master")
     while True:
-        run_once(board.tasks, interrupt=lambda: _interrupt(board), watchdog=lambda: None)
+        run_production_pass(board)
