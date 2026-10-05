@@ -26,14 +26,20 @@ def leds_for(*, link_up: bool, fault: bool, auto: bool, bypass: bool, rf: bool) 
     return {"link_ok": link_up, "error": fault, "auto": auto, "bypass": bypass, "rf": rf}
 
 
-def write_leds(state: LinkState, olat: object) -> None:
-    """Drive GPB2..GPB6. RF Present is on only above 1.0 W forward."""
+def write_leds(state: LinkState, olat: object, now_ms: int = 0) -> None:
+    """Drive GPB2..GPB6. RF Present needs a fresh sample above the threshold."""
+    sample = state.power_sample_ms
+    fresh = sample is None or now_ms - sample < master_config.POWER_STALE_MS
     flags = leds_for(
         link_up=state.link_up,
         fault=not state.link_up or bool(state.banner),
         auto=state.auto,
         bypass=state.bypass,
-        rf=state.forward_w is not None and state.forward_w > 1.0,
+        rf=(
+            fresh
+            and state.forward_w is not None
+            and state.forward_w > master_config.HOT_SWITCH_WATTS
+        ),
     )
     port = olat.port_b
     port = _set_bit(port, 2, flags["link_ok"])
@@ -71,11 +77,11 @@ def master_on_press(name: str, queue: list[Command], state: LinkState, menu: Men
         queue.append(Command.AM1 if state.auto else Command.AM0)
 
 
-def publish_display(state: LinkState, panel: object, olat: object | None = None) -> None:
+def publish_display(state: LinkState, panel: object, olat: object | None = None, now_ms: int = 0) -> None:
     """Draw the screen and, when the latch is present, the master LEDs."""
     publish(state, panel)
     if olat is not None:
-        write_leds(state, olat)
+        write_leds(state, olat, now_ms)
 
 
 def on_link_lost(state: LinkState, outbound: list[Command]) -> None:
@@ -173,6 +179,10 @@ def _master_drain(app: MasterApp) -> None:
         return
     buf = bytearray(data)
     drain_rs485(app.link, buf, app.state, app.shared.get("antenna_w"))
+    if app.link.saw_ack and app.state.banner == "Communication Lost":
+        app.state.link_up = True
+        app.state.banner = ""
+    write_leds(app.state, app.olat, app.now_ms)
     _apply_err(app)
 
 
@@ -223,7 +233,7 @@ def _master_publish(app: MasterApp) -> None:
     if app.menu.active:
         _show_menu(app, panel)
         return
-    publish_display(app.state, panel, app.olat)
+    publish_display(app.state, panel, app.olat, app.now_ms)
 
 
 def _emit_master_press(app: MasterApp, name: str) -> None:

@@ -119,6 +119,7 @@ class MasterLink:
         self._buffer = bytearray()
         self._queue: list[tuple[Command, bytes]] = []
         self.last_err: Frame | None = None
+        self.saw_ack = False
 
     def enqueue(self, command: Command, payload: bytes = b"") -> None:
         """Queue a command to send on the next idle poll instead of HHH."""
@@ -143,6 +144,7 @@ class MasterLink:
 
     def feed(self, data: bytes) -> None:
         """Accept remote bytes. An ACK for the open sequence frees the next poll."""
+        self.saw_ack = False
         self._buffer.extend(data)
         frames, leftover = decode_frames(bytes(self._buffer))
         self._buffer = bytearray(leftover)
@@ -210,6 +212,7 @@ class MasterLink:
             self._release(pending.sent_ms)
             return
         if frame.command is Command.ACK:
+            self.saw_ack = True
             self.link_lost = False
             self.misses = 0
             self._phase = "idle"

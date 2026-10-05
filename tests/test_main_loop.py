@@ -16,6 +16,57 @@ def _run(tasks, feeds: list[int]) -> None:
     run_once(tasks, interrupt=lambda: None, watchdog=lambda: feeds.append(1))
 
 
+def test_ack_clears_communication_lost_and_stale_power_drops_rf_present():
+    from master.tasks import write_leds
+
+    app = MasterApp()
+    app.now_ms = 200
+    _run(build_master_tasks(app), [])
+    sent = decode_frames(bytes(app.tx))[0][0]
+    app.tx.clear()
+    app.link.link_lost = True
+    app.state.banner = "Communication Lost"
+    app.state.link_up = False
+    _load(
+        app.rs485,
+        app.rs485_flags,
+        encode_frame(Frame(2, 1, sent.sequence, Command.ACK, bytes([Command.HHH.byte]))),
+    )
+    _run(build_master_tasks(app), [])
+    assert app.state.banner == ""
+    assert app.state.link_up is True
+    assert app.olat.port_b & (1 << 2)
+    assert app.olat.port_b & (1 << 3) == 0
+    assert app.link._queue == []
+
+    hot = MasterApp()
+    hot.now_ms = 200
+    _run(build_master_tasks(hot), [])
+    hot_sent = decode_frames(bytes(hot.tx))[0][0]
+    hot.state.banner = "Hot switch"
+    hot.state.link_up = True
+    _load(
+        hot.rs485,
+        hot.rs485_flags,
+        encode_frame(Frame(2, 1, hot_sent.sequence, Command.ACK, bytes([Command.HHH.byte]))),
+    )
+    _run(build_master_tasks(hot), [])
+    assert hot.state.banner == "Hot switch"
+
+    stale = MasterApp()
+    stale.state.forward_w = 1.1
+    stale.state.power_sample_ms = 0
+    stale.now_ms = 1000
+    write_leds(stale.state, stale.olat, stale.now_ms)
+    assert stale.olat.port_b & (1 << 6) == 0
+    stale.state.power_sample_ms = stale.now_ms
+    write_leds(stale.state, stale.olat, stale.now_ms)
+    assert stale.olat.port_b & (1 << 6)
+    stale.state.forward_w = 1.0
+    write_leds(stale.state, stale.olat, stale.now_ms)
+    assert stale.olat.port_b & (1 << 6) == 0
+
+
 def test_menu_select_enqueues_at1_on_the_master_link():
     from master.tasks import _master_buttons
 

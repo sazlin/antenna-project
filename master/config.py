@@ -38,6 +38,10 @@ REPLY_TRIES = 3
 MISS_LIMIT = 5
 # Hardware watchdog period.
 WATCHDOG_MS = 3000
+# Forward sample older than this does not light RF Present.
+POWER_STALE_MS = 1000
+# RF Present lights only above this forward power.
+HOT_SWITCH_WATTS = 1.0
 # Decision 5 button names, in menu and panel order.
 MASTER_BUTTONS = (
     "Up",
