@@ -15,6 +15,7 @@ END = 0x7F
 ESCAPE = 0x7D
 _SPECIAL = (START, END, ESCAPE)
 _STATUS = struct.Struct("<BHHHHBBBBH")
+_ANTENNA_ABSENT = 0xFFFF
 _FLAG_AUTO = 0x01
 _FLAG_BYPASS = 0x02
 _FLAG_ATU = 0x04
@@ -68,7 +69,10 @@ def _status_flags(status: Status) -> int:
 
 def pack_status(status: Status) -> bytes:
     """Pack watts, SWR, L, C, and antenna watts into the SND payload."""
-    antenna_watts = 0 if status.antenna_w is None else int(round(status.antenna_w * 10))
+    if status.antenna_w is None:
+        antenna_watts = _ANTENNA_ABSENT
+    else:
+        antenna_watts = int(round(status.antenna_w * 10))
     return _STATUS.pack(
         _status_flags(status),
         int(round(status.forward_w * 10)),
@@ -239,7 +243,10 @@ def unpack_status(data: bytes) -> Status:
     if len(data) != 15:
         raise ValueError(f"status payload is {len(data)} bytes, need 15")
     flags, forward, swr, inductance, capacitance, efficiency, antenna, error, source, antenna_watts = _STATUS.unpack(data)
-    antenna_w = antenna_watts / 10 if flags & _FLAG_EFFICIENCY else None
+    if flags & _FLAG_EFFICIENCY and antenna_watts != _ANTENNA_ABSENT:
+        antenna_w = antenna_watts / 10
+    else:
+        antenna_w = None
     return Status(
         auto=bool(flags & _FLAG_AUTO),
         bypass=bool(flags & _FLAG_BYPASS),

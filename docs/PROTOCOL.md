@@ -66,7 +66,7 @@ SND payload is 15 bytes, little-endian multi-byte fields.
 7. Selected antenna 0..4, uint8.
 8. Error code, uint8, 0 if none.
 9. Error source, uint8.
-10. Antenna watts times 10, uint16. This is the `Power` field. When the efficiency flag is clear, the master stores antenna watts as none and shows L and C. Do not multiply forward watts by efficiency.
+10. Antenna watts times 10, uint16. This is the `Power` field. `0xFFFF` means the sample is absent. When the efficiency flag is clear, or this field is `0xFFFF`, the master stores antenna watts as none and shows L and C. A real 0.0 W is packed as 0. Do not multiply forward watts by efficiency.
 
 Error codes: Failed to Execute 1, Data Not Available 2, Resource offline 3, Communication Lost 4, Data Corrupted 5, Hot switch 6, Relay fault 7.
 
