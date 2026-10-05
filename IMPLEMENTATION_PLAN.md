@@ -1110,7 +1110,7 @@ Commit: `feat: put pins, timeouts, and button maps in config`
 
 ### Task 50. MCP23017 direction, pull-up, and latch
 
-- [ ] Files: `common/mcp23017.py`, `tests/test_mcp23017.py`.
+- [x] Files: `common/mcp23017.py`, `tests/test_mcp23017.py`.
 
 Failing test, exact API:
 
