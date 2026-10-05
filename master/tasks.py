@@ -193,9 +193,38 @@ def build_master_tasks(app: MasterApp) -> list:
     ]
 
 
+_HANDLER = {
+    "at1": Command.AT1,
+    "at2": Command.AT2,
+    "at3": Command.AT3,
+    "at4": Command.AT4,
+    "at0": Command.AT0,
+    "tun": Command.TUN,
+    "am0": Command.AM0,
+    "am1": Command.AM1,
+    "byp1": Command.BYP1,
+    "byp0": Command.BYP0,
+    "tst1": Command.TST1,
+    "tst0": Command.TST0,
+    "tup": Command.TUP,
+    "tdn": Command.TDN,
+    "tsc": Command.TSC,
+    "tsl": Command.TSL,
+    "sta": Command.STA,
+    "rst": Command.RST,
+    "f86": Command.F86,
+}
+
+
+def queue_handler(name: str | None, queue: list[Command]) -> None:
+    """Queue one menu leaf. Exit runs no command."""
+    if name is None or name == "exit":
+        return
+    queue.append(_HANDLER[name])
+
+
 def enqueue_menu(menu: Menu, queue: list[Command]) -> str | None:
-    """Select the current leaf and queue Tune. Other handlers arrive with the full map."""
+    """Select the current leaf and queue its command."""
     name = menu.select()
-    if name == "tun":
-        queue.append(Command.TUN)
+    queue_handler(name, queue)
     return name

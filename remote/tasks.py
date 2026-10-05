@@ -413,6 +413,60 @@ def build_remote_tasks(app: RemoteApp) -> list:
     ]
 
 
+_HANDLER_COMMAND = {
+    "at1": Command.AT1,
+    "at2": Command.AT2,
+    "at3": Command.AT3,
+    "at4": Command.AT4,
+    "at0": Command.AT0,
+    "tun": Command.TUN,
+    "am0": Command.AM0,
+    "am1": Command.AM1,
+    "byp1": Command.BYP1,
+    "byp0": Command.BYP0,
+    "tst1": Command.TST1,
+    "tst0": Command.TST0,
+    "tup": Command.TUP,
+    "tdn": Command.TDN,
+    "tsc": Command.TSC,
+    "tsl": Command.TSL,
+    "sta": Command.STA,
+    "rst": Command.RST,
+}
+
+
+def run_menu_handler(
+    name: str | None,
+    latch: object,
+    state: LinkState,
+    power: PowerView,
+    link_up: bool,
+    port: object | None = None,
+) -> None:
+    """Run a remote menu leaf locally. Exit does nothing. Shutdown is not on this menu."""
+    del link_up
+    if name is None or name == "exit" or name == "f86":
+        return
+    command = _HANDLER_COMMAND[name]
+    if name.startswith("at"):
+        apply_from_link(Action(command, int(name[2])), latch, state, power)
+        return
+    link = RemoteLink()
+    frame = encode_frame(Frame(1, 2, 1, command, b""))
+    dispatch_frame(
+        frame,
+        link=link,
+        latch=latch,
+        state=state,
+        power=power,
+        port=port if port is not None else bytearray(),
+        mode="serial",
+        test_mode=TestMode(),
+        fallback=Fallback(),
+        opto=OptoBank(),
+    )
+
+
 def apply_menu(
     handler: str | None,
     latch: object,

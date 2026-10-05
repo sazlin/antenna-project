@@ -1233,7 +1233,7 @@ Commit: `feat: show an ATU timeout on the master after the ERR frame`
 
 ### Task 66. Run every menu handler
 
-- [ ] Files: `remote/tasks.py`, `master/tasks.py`, `tests/test_dispatch.py`.
+- [x] Files: `remote/tasks.py`, `master/tasks.py`, `tests/test_dispatch.py`.
 
 Task 63 keeps its F86 and RST cases at 50 W, its serial and fallback byte lists, and its link-down `at4` latch result. This task adds the rest of the frozen handler names so task 63 does not grow.
 

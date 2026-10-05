@@ -226,6 +226,55 @@ def test_fallback_tup_is_data_not_available():
         assert world["opto"].pressed == []
 
 
+def test_every_menu_handler_runs():
+    from master.tasks import queue_handler
+    from remote.tasks import run_menu_handler
+
+    master_queue: list[Command] = []
+    expected = {
+        "at1": Command.AT1,
+        "at2": Command.AT2,
+        "at3": Command.AT3,
+        "at4": Command.AT4,
+        "at0": Command.AT0,
+        "tun": Command.TUN,
+        "am0": Command.AM0,
+        "am1": Command.AM1,
+        "byp1": Command.BYP1,
+        "byp0": Command.BYP0,
+        "tst1": Command.TST1,
+        "tst0": Command.TST0,
+        "tup": Command.TUP,
+        "tdn": Command.TDN,
+        "tsc": Command.TSC,
+        "tsl": Command.TSL,
+        "sta": Command.STA,
+        "rst": Command.RST,
+        "f86": Command.F86,
+    }
+    for name, command in expected.items():
+        queue_handler(name, master_queue)
+        assert master_queue[-1] is command
+    before = len(master_queue)
+    queue_handler("exit", master_queue)
+    assert len(master_queue) == before
+    for link_up in (True, False):
+        for name, command in expected.items():
+            if name == "f86":
+                continue
+            latch = _Latch(0)
+            state = LinkState(antenna=0)
+            port = _Port()
+            run_menu_handler(name, latch, state, PowerView(0.0, 0, 0), link_up=link_up, port=port)
+            if name == "at4":
+                assert latch.read() == 0b1000
+            if name == "exit":
+                assert latch.writes == []
+        latch = _Latch(0)
+        run_menu_handler("exit", latch, LinkState(), PowerView(0.0, 0, 0), link_up=link_up, port=_Port())
+        assert latch.writes == []
+
+
 def test_master_menu_tune_enqueues_tun():
     from master.tasks import enqueue_menu
 
