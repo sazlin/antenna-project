@@ -464,7 +464,7 @@ Commit: `feat: show Communication Lost after five missed polls`
 
 ### Task 13. Remote ignores a duplicate sequence
 
-- [ ] Files: `common/protocol.py`, `tests/test_link_remote.py`.
+- [x] Files: `common/protocol.py`, `tests/test_link_remote.py`.
 
 Failing test: feed an encoded AT1 sequence 7 to `RemoteLink.on_bytes`. The result is `(None, Action(Command.AT1, antenna=1))`. Feed the same frame again before `finish`. The result is `(None, None)`. Call `finish(action)` and capture the ACK bytes. Feed the same frame a third time. The result is those same ACK bytes and action None. Decode the ACK: command ACK, payload byte `0x11`, sequence 7.
 

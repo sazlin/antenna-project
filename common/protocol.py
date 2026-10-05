@@ -370,3 +370,63 @@ def crc16_ccitt(data: bytes) -> int:
             else:
                 crc = (crc << 1) & 0xFFFF
     return crc
+
+
+_ANTENNA = {
+    Command.AT0: 0,
+    Command.AT1: 1,
+    Command.AT2: 2,
+    Command.AT3: 3,
+    Command.AT4: 4,
+}
+
+
+@dataclass(frozen=True)
+class Action:
+    """A command the remote applies to hardware before it sends ACK."""
+
+    command: Command
+    antenna: int | None = None
+
+
+class RemoteLink:
+    """Remote side of the polled link. It transmits only as a reply."""
+
+    def __init__(self) -> None:
+        """Start with no cached reply. The first poll will later carry RST RDY."""
+        self._buffer = bytearray()
+        self._open_sequence: int | None = None
+        self._cached: bytes | None = None
+        self._cached_sequence: int | None = None
+
+    def on_bytes(self, data: bytes) -> tuple[bytes | None, Action | None]:
+        """Parse one master frame. A duplicate before finish sends nothing."""
+        self._buffer.extend(data)
+        frames, leftover = decode_frames(bytes(self._buffer))
+        self._buffer = bytearray(leftover)
+        if not frames:
+            return None, None
+        return self._on_frame(frames[0])
+
+    def finish(self, action: Action) -> bytes:
+        """Cache the ACK for this sequence so a retry can resend it."""
+        if self._open_sequence is None:
+            raise RuntimeError("no open command to finish")
+        raw = encode_frame(
+            Frame(2, 1, self._open_sequence, Command.ACK, bytes([action.command.byte]))
+        )
+        self._cached = raw
+        self._cached_sequence = self._open_sequence
+        self._open_sequence = None
+        return raw
+
+    def _on_frame(self, frame: Frame) -> tuple[bytes | None, Action | None]:
+        """Run a new sequence once. The same sequence returns the cached reply."""
+        if frame.sequence == self._open_sequence:
+            return None, None
+        if self._cached is not None and frame.sequence == self._cached_sequence:
+            return self._cached, None
+        if frame.command in _ANTENNA:
+            self._open_sequence = frame.sequence
+            return None, Action(frame.command, _ANTENNA[frame.command])
+        return None, None
