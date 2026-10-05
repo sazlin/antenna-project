@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      {
+        "command": ".cursor/hooks/deny-dangerous/deny-dangerous.sh cursor"
+      },
+      {
+        "command": ".cursor/hooks/rtk-rewrite/rtk-rewrite.sh cursor"
+      }
+    ],
+    "sessionStart": [
+      {
+        "command": ".cursor/hooks/ponytail-activate/ponytail-activate cursor"
+      },
+      {
+        "command": ".cursor/hooks/skill-telemetry/skill-telemetry cursor",
+        "timeout": 5
+      }
+    ],
+    "sessionEnd": [
+      {
+        "command": ".cursor/hooks/skill-telemetry/skill-telemetry cursor",
+        "timeout": 5
+      }
+    ],
+    "beforeReadFile": [
+      {
+        "command": ".cursor/hooks/skill-telemetry/skill-telemetry cursor",
+        "timeout": 5
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "command": ".cursor/hooks/skill-telemetry/skill-telemetry cursor",
+        "timeout": 5
+      }
+    ],
+    "stop": [
+      {
+        "command": ".cursor/hooks/skill-telemetry/skill-telemetry cursor",
+        "timeout": 5
+      }
+    ],
+    "subagentStart": [
+      {
+        "command": ".cursor/hooks/skill-telemetry/skill-telemetry cursor",
+        "timeout": 5
+      }
+    ]
+  }
+}

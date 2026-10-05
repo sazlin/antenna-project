@@ -1,0 +1,9 @@
+source: https://github.com/sazlin/loadout
+ref: main
+loadouts:
+- base
+- python
+- implementation_harness
+- github
+- telemetry
+- orca
