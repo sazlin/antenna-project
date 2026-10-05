@@ -7,6 +7,29 @@ def _frame(command: Command, sequence: int, payload: bytes = b"") -> bytes:
     return encode_frame(Frame(1, 2, sequence, command, payload))
 
 
+def test_boot_and_rst_send_ready():
+    link = RemoteLink()
+    reply, action = link.on_bytes(_frame(Command.HHH, 1))
+    frames, _leftover = decode_frames(reply)
+    assert action is None
+    assert frames[0].command is Command.RST_RDY
+    assert frames[0].command.mnemonic == "RST RDY"
+    reply, _action = link.on_bytes(_frame(Command.HHH, 2))
+    frames, _leftover = decode_frames(reply)
+    assert frames[0].command is Command.ACK
+    reply, action = link.on_bytes(_frame(Command.RST, 3))
+    assert action == Action(Command.RST, None)
+    ack, _leftover = decode_frames(link.finish(action))
+    assert ack[0].command is Command.ACK
+    assert ack[0].payload == bytes([Command.RST.byte])
+    reply, _action = link.on_bytes(_frame(Command.HHH, 4))
+    frames, _leftover = decode_frames(reply)
+    assert frames[0].command is Command.RST_RDY
+    reply, _action = link.on_bytes(_frame(Command.HHH, 5))
+    frames, _leftover = decode_frames(reply)
+    assert frames[0].command is Command.ACK
+
+
 def test_sta_replies_with_snd():
     link = RemoteLink()
     payload = bytes(range(13))

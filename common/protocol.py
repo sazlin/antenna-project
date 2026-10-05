@@ -400,6 +400,7 @@ class RemoteLink:
         self._cached: bytes | None = None
         self._cached_sequence: int | None = None
         self._pending_status: bytes | None = None
+        self._ready = True
 
     def on_bytes(self, data: bytes) -> tuple[bytes | None, Action | None]:
         """Parse one master frame. A duplicate before finish sends nothing."""
@@ -445,9 +446,18 @@ class RemoteLink:
             if self._pending_status is None:
                 return self._unavailable(frame), None
             return self._reply(frame, Command.SND, self._pending_status), None
+        if frame.command is Command.RST:
+            self._ready = True
+            self._open_sequence = frame.sequence
+            return None, Action(Command.RST, None)
         if frame.command is Command.HHH:
             if self._pending_status is not None:
                 return self._reply(frame, Command.RS, b""), None
+            if self._ready:
+                # Boot and RST announce ready on the idle poll. A queued status
+                # still goes out as RS so the reading is not dropped.
+                self._ready = False
+                return self._reply(frame, Command.RST_RDY, b""), None
             return self._reply(frame, Command.ACK, bytes([Command.HHH.byte])), None
         if frame.command is Command.RR:
             if self._pending_status is not None:

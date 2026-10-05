@@ -530,7 +530,7 @@ Commit: `feat: answer STA with SND`
 
 ### Task 17. RST then RST RDY
 
-- [ ] Files: `common/protocol.py`, `tests/test_link_remote.py`.
+- [x] Files: `common/protocol.py`, `tests/test_link_remote.py`.
 
 Failing test: the first frame after construction, an HHH, returns command `RST_RDY` and mnemonic `RST RDY`. After that, an HHH returns ACK. A RST frame returns action `Command.RST` and, after `finish`, ACK of RST. The next HHH returns `RST RDY` once, then ACK again.
 
