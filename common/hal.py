@@ -11,6 +11,7 @@ except ImportError:
     machine = None
 
 watchdog_ms: int | None = None
+_wdt = None
 _host_ticks_ms = 0
 _sleep_hook = lambda _delay_ms: None
 
@@ -37,7 +38,7 @@ def sleep_ms(delay_ms: int) -> None:
 
 def ticks_ms() -> int:
     """Milliseconds since boot. Tasks that tests drive keep the assigned now_ms."""
-    if machine is not None:
+    if machine is not None and hasattr(time, "ticks_ms"):
         return time.ticks_ms()
     return _host_ticks_ms
 
@@ -50,11 +51,18 @@ def bind(module: object) -> None:
 
 def start_watchdog(timeout_ms: int) -> None:
     """Arm the hardware watchdog. On the host, machine is None, so this only records the request."""
-    global watchdog_ms
+    global watchdog_ms, _wdt
     watchdog_ms = timeout_ms
     if machine is None:
+        _wdt = None
         return
-    machine.WDT(timeout=timeout_ms)
+    _wdt = machine.WDT(timeout=timeout_ms)
+
+
+def feed_watchdog() -> None:
+    """Kick the watchdog once per pass. A missing instance means the host."""
+    if _wdt is not None:
+        _wdt.feed()
 
 
 class Flags:
