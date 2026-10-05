@@ -889,7 +889,7 @@ Commit: `feat: place the Auto and Bypass markers on line 1`
 
 ### Task 38. Efficiency screen at 1 W and above
 
-- [ ] Files: `common/display.py`, `tests/test_display_format.py`.
+- [x] Files: `common/display.py`, `tests/test_display_format.py`.
 
 Failing test: `forward_w` 100.0, `antenna_w` 99.0, efficiency 99, swr 1.15, auto True, bypass False returns `("100.0W         .", "1.15", "99.0W", "99%")`. `forward_w` 1.0, `antenna_w` 0.5, efficiency 99, and the same SWR returns the efficiency screen with line 3 `0.5W`, not a product of 1.0 and 0.99. `forward_w` 0.9 with efficiency 99 and `antenna_w` 0.5 returns the L/C screen. Efficiency None at `forward_w` 100.0 returns the L/C screen. Efficiency 100 with `antenna_w` 100.0 displays `99%` and line 3 `100.0W`.
 

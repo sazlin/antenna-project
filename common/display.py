@@ -33,16 +33,29 @@ def _line1(text: str, marker: str) -> str:
     return f"{text:<15}{marker}"
 
 
+def _efficiency_screen(reading: Reading) -> bool:
+    """The loss screen starts at 1.0 W, and only when both power numbers exist."""
+    if reading.forward_w < 1.0:
+        return False
+    if reading.efficiency is None or reading.antenna_w is None:
+        return False
+    return True
+
+
 def screen_lines(reading: Reading) -> tuple[str, str, str, str]:
     """Build the four tuner lines. LC puts L above C. CL swaps them."""
     line1 = _line1(format_power(reading.forward_w), _marker(reading))
+    swr = format_swr(reading.swr)
+    if _efficiency_screen(reading):
+        percent = min(reading.efficiency, 99)
+        return line1, swr, format_power(reading.antenna_w), f"{percent}%"
     inductance = format_inductance_nh(reading.inductance_nh)
     capacitance = format_capacitance_pf(reading.capacitance_pf)
     if reading.order == "CL":
         third, fourth = capacitance, inductance
     else:
         third, fourth = inductance, capacitance
-    return line1, format_swr(reading.swr), third, fourth
+    return line1, swr, third, fourth
 
 
 def format_power(watts: float) -> str:

@@ -17,6 +17,28 @@ def _reading(**overrides: object) -> Reading:
     return Reading(**values)
 
 
+def test_efficiency_screen_at_one_watt():
+    lines = screen_lines(_reading(antenna_w=99.0, efficiency=99))
+    assert lines == ("100.0W         .", "1.15", "99.0W", "99%")
+    low = screen_lines(_reading(forward_w=1.0, antenna_w=0.5, efficiency=99))
+    assert low[2] == "0.5W"
+    assert low[3] == "99%"
+
+
+def test_efficiency_hidden_below_one_watt():
+    lines = screen_lines(_reading(forward_w=0.9, antenna_w=0.5, efficiency=99))
+    assert lines[2] == "1.25uH"
+    assert lines[3] == "150pF"
+    missing = screen_lines(_reading(forward_w=100.0, efficiency=None, antenna_w=99.0))
+    assert missing[2] == "1.25uH"
+
+
+def test_efficiency_capped_at_99():
+    lines = screen_lines(_reading(antenna_w=100.0, efficiency=100))
+    assert lines[2] == "100.0W"
+    assert lines[3] == "99%"
+
+
 def test_auto_marker_and_lc_order():
     lines = screen_lines(_reading())
     assert lines[0] == "100.0W         ."
