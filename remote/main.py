@@ -74,6 +74,7 @@ def _arm_uart(uart: object, ring: object, flags: object) -> None:
     """The UART interrupt only stores bytes. Decoding waits for the task pass."""
 
     def _on_rx(source: object) -> None:
+        """Store one UART byte and leave decoding to the task pass."""
         data = source.read(1)
         if data:
             note_rx_byte(ring, flags, data[0])
@@ -86,6 +87,7 @@ def _arm_pin(pin: object, flags: object) -> None:
     """INTA and INTB only raise a flag. The pass reads the expander."""
 
     def _on_edge(_pin: object) -> None:
+        """Raise the expander flag. The task pass reads the GPIO registers."""
         flags.mcp = True
 
     if hasattr(pin, "irq"):

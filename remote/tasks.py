@@ -526,6 +526,7 @@ def _remote_buttons(app: RemoteApp) -> None:
     """Debounce a press and run it on this board's tuner and relays."""
 
     def act(name: str) -> None:
+        """Run one debounced remote press on this board's menu and tuner."""
         local: list[str] = []
         remote_on_press(name, app.menu, local)
         app.events.append(name)
