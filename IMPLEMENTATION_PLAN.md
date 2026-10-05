@@ -713,7 +713,7 @@ Commit: `feat: open every relay on boot, reset, watchdog, and F86`
 
 ### Task 29. Outbound ukoda JSON, one field
 
-- [ ] Files: `remote/atu_link.py`, `tests/test_atu_json.py`.
+- [x] Files: `remote/atu_link.py`, `tests/test_atu_json.py`.
 
 Failing test: `encode_command(Command.AM0) == b'{"Auto":true}\n'`, AM1 false, BYP0 false, BYP1 true, TUN, STA, RST match Frozen ATU JSON. `encode_command(Command.AM0)` does not contain `Bypass`. The module source contains the required AM0 sentence from Frozen ATU JSON.
 
