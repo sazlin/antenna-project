@@ -695,7 +695,7 @@ Commit: `feat: allow an antenna change at 1 W or without fresh power`
 
 ### Task 28. force_all_off ignores power
 
-- [ ] Files: `remote/relays.py`, `tests/test_relays.py`.
+- [x] Files: `remote/relays.py`, `tests/test_relays.py`.
 
 Failing test: latch holds `0b1000`. `force_all_off(latch)` writes 0 and does not take a power argument. A second test `test_f86_path_uses_force_all_off` calls the helper `shutdown_relays(latch)` which calls `force_all_off` and returns the reason string `F86`. Reasons `boot`, `reset`, and `watchdog` are the same helper `safe_off(latch, reason)` returning that reason and leaving the latch at 0. `safe_off` does not call `set_antenna`.
 

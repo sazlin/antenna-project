@@ -8,6 +8,30 @@ from common.errors import ErrorCode, RelayFault
 from common.state import LinkState
 
 
+_OFF_REASONS = ("boot", "reset", "watchdog", "F86", "fault")
+
+
+def force_all_off(latch: object) -> None:
+    """Open every coil. This ignores forward power and does not close another one."""
+    latch.write(0)
+    if latch.read() != 0:
+        latch.write(0)
+        raise RelayFault("all-off readback was not zero")
+
+
+def safe_off(latch: object, reason: str) -> str:
+    """Open every coil for boot, reset, watchdog, F86, or a coil fault."""
+    if reason not in _OFF_REASONS:
+        raise ValueError(f"unknown safe-off reason {reason}")
+    force_all_off(latch)
+    return reason
+
+
+def shutdown_relays(latch: object) -> str:
+    """F86 entry. The coils open even while the station is transmitting."""
+    return safe_off(latch, "F86")
+
+
 def apply_antenna_command(
     latch: object,
     state: LinkState,
