@@ -825,7 +825,7 @@ Commit: `feat: step L and C with ukoda relay masks`
 
 ### Task 34. Fallback button presses
 
-- [ ] Files: `remote/button_emulation.py`, `tests/test_fallback.py`.
+- [x] Files: `remote/button_emulation.py`, `tests/test_fallback.py`.
 
 Failing test: `Fallback(initial_auto=False, initial_bypass=False)`. `press_for(Command.TUN)` returns `[("tune", 400)]`. `press_for(Command.RST)` returns `[("tune", 100)]`. `press_for(Command.AM0)` returns `[("auto", 80)]` and the remembered auto state becomes true. A second AM0 returns `[]`. `press_for(Command.AM1)` returns `[("auto", 80)]`. `press_for(Command.BYP1)` returns `[("bypass", 80)]`. `press_for(Command.TUP)` returns error `DATA_NOT_AVAILABLE` and no press. Same for TDN, TSC, TSL, TST0, TST1. `press_for(Command.STA)` returns that same error.
 
