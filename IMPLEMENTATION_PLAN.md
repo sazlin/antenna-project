@@ -905,7 +905,7 @@ Commit: `feat: show antenna power and efficiency from 1 W up`
 
 ### Task 39. Display line, character, scrollback, highlight
 
-- [ ] Files: `common/display.py`, `tests/test_display_buffer.py`.
+- [x] Files: `common/display.py`, `tests/test_display_buffer.py`.
 
 Failing test: `DisplayBuffer()`. `write_line(1, "100.0W")` then `line(1)` equals that string. `write_line(0, "x")` and `write_line(5, "x")` raise `ValueError`. `write_char(2, 1, "A")` puts `A` at column 1 of line 2. `push_scroll("older")` then seven more lines, then one more, leaves 8 stored lines and drops the oldest. `highlight()` is None until `set_highlight(3)`, then it returns 3. `set_highlight(0)` raises `ValueError`.
 

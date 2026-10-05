@@ -76,3 +76,51 @@ def format_capacitance_pf(picofarads: int) -> str:
 def format_swr(swr: float) -> str:
     """Format SWR with two decimals and no unit."""
     return f"{swr:.2f}"
+
+
+class DisplayBuffer:
+    """Four text lines, an 8-line scrollback, and the highlighted menu row."""
+
+    def __init__(self) -> None:
+        """Start blank. Nothing is highlighted until the menu opens."""
+        self._lines = ["", "", "", ""]
+        self._scroll: list[str] = []
+        self._highlight: int | None = None
+
+    def write_line(self, number: int, text: str) -> None:
+        """Replace one of the four visible lines. Lines are numbered 1 to 4."""
+        self._lines[self._index(number)] = text
+
+    def line(self, number: int) -> str:
+        """Return one visible line."""
+        return self._lines[self._index(number)]
+
+    def write_char(self, number: int, column: int, char: str) -> None:
+        """Put one character in a 1-based column of a visible line."""
+        index = self._index(number)
+        current = self._lines[index].ljust(column)
+        self._lines[index] = current[: column - 1] + char + current[column:]
+
+    def push_scroll(self, text: str) -> None:
+        """Keep the newest eight scrollback lines and drop the oldest."""
+        self._scroll.append(text)
+        if len(self._scroll) > 8:
+            self._scroll.pop(0)
+
+    def scroll_lines(self) -> list[str]:
+        """Return the stored scrollback, oldest first."""
+        return list(self._scroll)
+
+    def highlight(self) -> int | None:
+        """Return the highlighted row, or None when the menu is closed."""
+        return self._highlight
+
+    def set_highlight(self, number: int) -> None:
+        """Mark a visible row. Zero is not a row."""
+        self._highlight = self._index(number) + 1
+
+    def _index(self, number: int) -> int:
+        """Convert a 1-based line number to a list index."""
+        if number not in (1, 2, 3, 4):
+            raise ValueError(f"line {number} is not 1..4")
+        return number - 1
