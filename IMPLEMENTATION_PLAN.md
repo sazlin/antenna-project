@@ -306,7 +306,7 @@ Commit: `feat: list every master and remote command byte`
 
 ### Task 03. Encode the AT1 frame
 
-- [ ] Files: `common/protocol.py`, `tests/test_frame.py`.
+- [x] Files: `common/protocol.py`, `tests/test_frame.py`.
 
 Failing test:
 
