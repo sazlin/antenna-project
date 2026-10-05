@@ -292,7 +292,7 @@ Commit: `feat: add CRC-16/CCITT-FALSE for RS485 frames`
 
 ### Task 02. Command catalog
 
-- [ ] Files: `common/commands.py`, `tests/test_commands.py`.
+- [x] Files: `common/commands.py`, `tests/test_commands.py`.
 
 Failing test: build a dict of mnemonic to byte for every row in the Frozen protocol table, including `RST RDY` mapping to `Command.RST_RDY`. Assert 28 unique bytes, one per Frozen protocol row from ACK through F86, including `RST_RDY` at `0x34` and `F86` at `0x35`. Also assert `Command.AT2.byte == 0x12` (the spec typo AT22 is not a name), `Command["AT0"].byte == 0x10`, and `CODE_TO_COMMAND[0x23] is Command.AM0`.
 
