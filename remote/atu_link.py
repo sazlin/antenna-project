@@ -117,13 +117,22 @@ class AtuLink:
         self.last_status: TunerStatus | None = None
         self._announced = False
 
-    def send(self, command: Command, now_ms: int) -> ErrorCode | None:
-        """Write one line unless a reply is already outstanding."""
+    def begin(self, line: bytes, command: Command, now_ms: int) -> ErrorCode | None:
+        """Send one already-encoded line and wait for its reply."""
         if self.busy:
             return ErrorCode.FAILED_TO_EXECUTE
+        self._line = line
+        self._command = command
         self._attempt = 0
-        self._write(command, now_ms)
+        self.port.write(line)
+        self.busy = True
+        self._sent_ms = now_ms
+        self._attempt = 1
         return None
+
+    def send(self, command: Command, now_ms: int) -> ErrorCode | None:
+        """Write one line unless a reply is already outstanding."""
+        return self.begin(encode_command(command), command, now_ms)
 
     def poll(self, now_ms: int) -> ErrorCode | None:
         """Retry a normal command three times. Tune waits out the long timer."""
@@ -140,8 +149,8 @@ class AtuLink:
         return ErrorCode.RESOURCE_OFFLINE
 
     def _write(self, command: Command, now_ms: int) -> None:
-        """Put one ukoda line on the port and start its reply timer."""
-        self.port.write(encode_command(command))
+        """Repeat the outstanding line. Tune is not repeated."""
+        self.port.write(self._line)
         self.busy = True
         self._command = command
         self._sent_ms = now_ms

@@ -9,7 +9,7 @@ from common.display import publish
 from common.errors import ErrorCode, RelayFault
 from common.hal import ByteRing, Flags, drain_rx
 from common.menu import Menu
-from common.protocol import Action, Frame, RemoteLink, Status, encode_frame, pack_status
+from common.protocol import Action, Frame, RemoteLink, Status, decode_frames, encode_frame, pack_status
 from common.state import LinkState, commit
 from remote import config
 from remote.atu_link import AtuLink, TestMode, encode_command
@@ -114,7 +114,7 @@ def dispatch_frame(
         return link.finish(action)
     if mode == "fallback":
         return _fallback_command(link, action, fallback, opto, now_ms)
-    return _serial_command(link, action, port, test_mode)
+    return _serial_command(link, action, port, test_mode, now_ms)
 
 
 def _send_reset(port: object, mode: str, fallback: Fallback, opto: OptoBank, now_ms: int) -> None:
@@ -122,7 +122,11 @@ def _send_reset(port: object, mode: str, fallback: Fallback, opto: OptoBank, now
     if mode == "fallback":
         opto.drive(fallback.press_for(Command.RST), now_ms)
         return
-    port.write(b'{"Reset":true}\n')
+    failed = _emit_tuner(port, b'{"Reset":true}\n', Command.RST, now_ms, None)
+    if failed is not None:
+        return
+    if not hasattr(port, "begin_tuner"):
+        return
 
 
 def _fallback_command(
@@ -136,14 +140,33 @@ def _fallback_command(
     return link.finish(action)
 
 
-def _serial_command(link: object, action: Action, port: object, test_mode: TestMode) -> bytes:
+def _emit_tuner(
+    port: object, line: bytes, command: Command, now_ms: int, link: object
+) -> ErrorCode | None:
+    """Hand an encoded line to AtuLink when the port is the remote. Otherwise write it raw."""
+    begin = getattr(port, "begin_tuner", None)
+    if begin is None:
+        port.write(line)
+        return None
+    sequence = 0 if link is None else (link._open_sequence or 0)
+    return begin(line, command, now_ms, sequence)
+
+
+def _serial_command(
+    link: object, action: Action, port: object, test_mode: TestMode, now_ms: int
+) -> bytes:
     """Forward one tuner command. Test steps use RelayI and RelayC, not the JSON map."""
     if action.command in (Command.TST0, Command.TST1, Command.TUP, Command.TDN, Command.TSC, Command.TSL):
         line = test_mode.command(action.command)
-        if line is not None:
-            port.write(line)
+        if line is None:
+            return link.finish(action)
+        failed = _emit_tuner(port, line, action.command, now_ms, link)
+        if failed is not None:
+            return link.fail(action.command, failed, 2)
         return link.finish(action)
-    port.write(encode_command(action.command))
+    failed = _emit_tuner(port, encode_command(action.command), action.command, now_ms, link)
+    if failed is not None:
+        return link.fail(action.command, failed, 2)
     return link.finish(action)
 
 
@@ -182,7 +205,7 @@ def poll_atu(atu: AtuLink, state: LinkState, link: object, now_ms: int) -> bytes
     """Commit a parsed tuner object once, then offer it on the next idle poll."""
     offline = atu.poll(now_ms)
     if offline is ErrorCode.RESOURCE_OFFLINE:
-        return encode_err(ErrorCode.RESOURCE_OFFLINE, 3, Command.STA)
+        return ErrorCode.RESOURCE_OFFLINE
     status = atu.last_status
     if status is None or atu._announced:
         return
@@ -340,6 +363,12 @@ class RemoteApp:
         self.panel = _Panel()
         self.olat = _Olat()
 
+    def begin_tuner(self, line: bytes, command: Command, now_ms: int, sequence: int) -> ErrorCode | None:
+        """Start one tuner exchange and remember which RS485 sequence asked for it."""
+        self.tuner_sequence = sequence
+        self.tuner_command = command
+        return self.atu.begin(line, command, now_ms)
+
     def write(self, data: bytes) -> None:
         """AtuLink uses this as the UART write. UART1 gets the same bytes."""
         self.port_writes.append(data)
@@ -372,6 +401,22 @@ def _remote_drain(app: RemoteApp) -> None:
     data = drain_rx(app.rs485, app.rs485_flags)
     if not data:
         return
+    pending = getattr(app, "pending_err", None)
+    if pending is not None:
+        frames, _leftover = decode_frames(data)
+        if frames:
+            code, source, command_byte = pending
+            app.pending_err = None
+            reply = encode_frame(
+                Frame(2, 1, frames[0].sequence, Command.ERR, bytes([int(code), source, command_byte]))
+            )
+            app.last_accept_ms = app.now_ms
+            app.state.link_up = True
+            if app.state.banner == "Communication Lost":
+                app.state.banner = ""
+            app.tx.extend(reply)
+            _flush_rs485(app)
+            return
     power = _power_from_state(app)
     app.power = power
     reply = dispatch_frame(
@@ -409,8 +454,12 @@ def _remote_poll_atu(app: RemoteApp) -> None:
     if data:
         app.atu.feed(data)
     err = poll_atu(app.atu, app.state, app.link, app.now_ms)
-    if err:
-        app.tx.extend(err)
+    if err is not None and app.atu._command is not None:
+        app.pending_err = (err, 3, app.atu._command.byte)
+        sequence = getattr(app, "tuner_sequence", 0)
+        app.tx.extend(
+            encode_frame(Frame(2, 1, sequence, Command.ERR, bytes([int(err), 3, app.atu._command.byte])))
+        )
     app.power = _power_from_state(app)
     app.shared["antenna_w"] = app.state.antenna_w
 

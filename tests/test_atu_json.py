@@ -27,6 +27,66 @@ class _Port:
         self.writes.append(data)
 
 
+def test_dispatched_status_is_retried_three_times_then_resource_offline():
+    from common.hal import note_rx_byte
+    from common.protocol import Frame, decode_frames, encode_frame
+    from common.scheduler import run_once
+    from remote.tasks import RemoteApp, build_remote_tasks
+
+    app = RemoteApp()
+    app.now_ms = 0
+    for byte in encode_frame(Frame(1, 2, 7, Command.STA, b"")):
+        note_rx_byte(app.rs485, app.rs485_flags, byte)
+    run_once(build_remote_tasks(app), interrupt=lambda: None, watchdog=lambda: None)
+    assert app.port_writes == [b'{"Status":true}\n']
+    assert app.atu.busy is True
+    app.now_ms = 500
+    run_once(build_remote_tasks(app), interrupt=lambda: None, watchdog=lambda: None)
+    app.now_ms = 1000
+    run_once(build_remote_tasks(app), interrupt=lambda: None, watchdog=lambda: None)
+    assert app.port_writes == [b'{"Status":true}\n'] * 3
+    app.now_ms = 1500
+    run_once(build_remote_tasks(app), interrupt=lambda: None, watchdog=lambda: None)
+    assert app.atu.busy is False
+    assert len(app.port_writes) == 3
+    for byte in encode_frame(Frame(1, 2, 8, Command.HHH, b"")):
+        note_rx_byte(app.rs485, app.rs485_flags, byte)
+    run_once(build_remote_tasks(app), interrupt=lambda: None, watchdog=lambda: None)
+    err = decode_frames(bytes(app.tx))[0][-1]
+    assert err.command is Command.ERR
+    assert err.sequence == 8
+    assert err.payload == bytes([3, 3, Command.STA.byte])
+    sent = len(app.port_writes)
+    for byte in encode_frame(Frame(1, 2, 9, Command.AM0, b"")):
+        note_rx_byte(app.rs485, app.rs485_flags, byte)
+    # AM0 after the tuner is idle should be allowed. The busy case is separate.
+    busy = RemoteApp()
+    busy.now_ms = 0
+    for byte in encode_frame(Frame(1, 2, 1, Command.STA, b"")):
+        note_rx_byte(busy.rs485, busy.rs485_flags, byte)
+    run_once(build_remote_tasks(busy), interrupt=lambda: None, watchdog=lambda: None)
+    for byte in encode_frame(Frame(1, 2, 2, Command.AM0, b"")):
+        note_rx_byte(busy.rs485, busy.rs485_flags, byte)
+    run_once(build_remote_tasks(busy), interrupt=lambda: None, watchdog=lambda: None)
+    assert busy.port_writes == [b'{"Status":true}\n']
+    refused = decode_frames(bytes(busy.tx))[0][-1]
+    assert refused.payload[0] == ErrorCode.FAILED_TO_EXECUTE
+    tune = RemoteApp()
+    tune.now_ms = 0
+    for byte in encode_frame(Frame(1, 2, 1, Command.TUN, b"")):
+        note_rx_byte(tune.rs485, tune.rs485_flags, byte)
+    run_once(build_remote_tasks(tune), interrupt=lambda: None, watchdog=lambda: None)
+    tune.now_ms = 29999
+    run_once(build_remote_tasks(tune), interrupt=lambda: None, watchdog=lambda: None)
+    assert tune.atu.busy is True
+    assert tune.port_writes == [b'{"Tune":true}\n']
+    tune.now_ms = 30000
+    run_once(build_remote_tasks(tune), interrupt=lambda: None, watchdog=lambda: None)
+    assert tune.atu.busy is False
+    assert tune.port_writes == [b'{"Tune":true}\n']
+    assert sent == 3
+
+
 def test_second_send_while_waiting_fails():
     port = _Port()
     link = AtuLink(port)
