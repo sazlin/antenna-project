@@ -330,7 +330,7 @@ Commit: `feat: encode an AT1 RS485 frame`
 
 ### Task 04. Decode the AT1 frame
 
-- [ ] Files: `common/protocol.py`, `tests/test_frame.py`.
+- [x] Files: `common/protocol.py`, `tests/test_frame.py`.
 
 Failing test: `decode_frames(bytes.fromhex("7e010201110047517f"))` returns one frame with `command is Command.AT1`, sequence 1, empty payload, and an empty leftover.
 

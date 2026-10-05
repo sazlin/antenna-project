@@ -4,7 +4,7 @@
 
 from dataclasses import dataclass
 
-from common.commands import Command
+from common.commands import CODE_TO_COMMAND, Command
 
 START = 0x7E
 END = 0x7F
@@ -39,6 +39,33 @@ def encode_frame(frame: Frame) -> bytes:
     body = _body(frame)
     crc = crc16_ccitt(body)
     return bytes([START]) + body + bytes([crc & 0xFF, (crc >> 8) & 0xFF, END])
+
+
+def _frame_from_body(body: bytes) -> Frame | None:
+    """Turn an unescaped body into a frame when the length byte matches."""
+    if len(body) < 5 or len(body) != 5 + body[4]:
+        return None
+    return Frame(
+        source=body[0],
+        destination=body[1],
+        sequence=body[2],
+        command=CODE_TO_COMMAND[body[3]],
+        payload=body[5:],
+    )
+
+
+def decode_frames(data: bytes) -> tuple[list[Frame], bytes]:
+    """Decode one complete unescaped frame. Anything else is not delivered."""
+    if len(data) < 9 or data[0] != START or data[-1] != END:
+        return [], b""
+    raw = data[1:-1]
+    body, crc_lo, crc_hi = raw[:-2], raw[-2], raw[-1]
+    if crc16_ccitt(body) != (crc_lo | (crc_hi << 8)):
+        return [], b""
+    frame = _frame_from_body(body)
+    if frame is None:
+        return [], b""
+    return [frame], b""
 
 
 def crc16_ccitt(data: bytes) -> int:
