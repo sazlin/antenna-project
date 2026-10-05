@@ -98,13 +98,15 @@ def maybe_poll(link: MasterLink, now_ms: int, tx: bytearray) -> None:
         tx.extend(raw)
 
 
-def drain_rs485(link: MasterLink, rx: bytearray, state: LinkState) -> None:
-    """Read remote frames. Antenna watts come from the SND payload."""
+def drain_rs485(link: MasterLink, rx: bytearray, state: LinkState, now_ms: int = 0) -> None:
+    """Commit tuner fields only when this buffer holds a new SND."""
     if not rx:
         return
     data = bytes(rx)
     rx.clear()
     link.feed(data)
+    if not link.saw_snd:
+        return
     reading = link.status()
     if reading is None:
         return
@@ -120,8 +122,7 @@ def drain_rs485(link: MasterLink, rx: bytearray, state: LinkState) -> None:
         bypass=reading.bypass,
         order=reading.order,
         antenna=reading.antenna,
-        link_up=True,
-        banner="",
+        power_sample_ms=now_ms,
     )
 
 
@@ -170,7 +171,7 @@ def _apply_err(app: MasterApp) -> None:
     if frame is None or not frame.payload:
         return
     app.state.banner = ErrorCode(frame.payload[0]).nature
-    write_leds(app.state, app.olat)
+    write_leds(app.state, app.olat, app.now_ms)
     app.link.last_err = None
 
 
@@ -180,10 +181,11 @@ def _master_drain(app: MasterApp) -> None:
     if not data:
         return
     buf = bytearray(data)
-    drain_rs485(app.link, buf, app.state)
+    drain_rs485(app.link, buf, app.state, app.now_ms)
     if app.link.saw_ack and app.state.banner == "Communication Lost":
         app.state.link_up = True
         app.state.banner = ""
+        app._announced_loss = False
     write_leds(app.state, app.olat, app.now_ms)
     _apply_err(app)
 
@@ -225,7 +227,7 @@ def _show_menu(app: MasterApp, panel: object) -> None:
     app.menu_highlight = highlight
     padded = (labels + ["", "", "", ""])[:4]
     panel.show_lines((padded[0], padded[1], padded[2], padded[3]))
-    write_leds(app.state, app.olat)
+    write_leds(app.state, app.olat, app.now_ms)
 
 
 def _master_publish(app: MasterApp) -> None:

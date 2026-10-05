@@ -1,10 +1,31 @@
 from common.commands import Command
 from common.display import Reading, screen_lines
 from common.hal import note_rx_byte
-from common.protocol import Frame, decode_frames, encode_frame
+from common.protocol import Frame, Status, decode_frames, encode_frame, pack_status
 from common.scheduler import run_once
 from master.tasks import MasterApp, build_master_tasks
 from remote.tasks import PowerView, RemoteApp, build_remote_tasks
+
+
+def _reading(forward: float) -> Status:
+    return Status(
+        auto=False,
+        bypass=False,
+        atu_link=True,
+        test_mode=False,
+        efficiency_valid=True,
+        power_valid=True,
+        order="LC",
+        forward_w=forward,
+        swr=1.1,
+        inductance_nh=0,
+        capacitance_pf=0,
+        efficiency_pct=90,
+        antenna=1,
+        error_code=0,
+        error_source=0,
+        antenna_w=forward,
+    )
 
 
 def _load(ring, flags, data: bytes) -> None:
@@ -27,6 +48,8 @@ def test_ack_clears_communication_lost_and_stale_power_drops_rf_present():
     app.link.link_lost = True
     app.state.banner = "Communication Lost"
     app.state.link_up = False
+    _run(build_master_tasks(app), [])
+    assert app._announced_loss is True
     _load(
         app.rs485,
         app.rs485_flags,
@@ -38,6 +61,9 @@ def test_ack_clears_communication_lost_and_stale_power_drops_rf_present():
     assert app.olat.port_b & (1 << 2)
     assert app.olat.port_b & (1 << 3) == 0
     assert app.link._queue == []
+    app.link.link_lost = True
+    _run(build_master_tasks(app), [])
+    assert app.state.banner == "Communication Lost"
 
     hot = MasterApp()
     hot.now_ms = 200
@@ -53,6 +79,37 @@ def test_ack_clears_communication_lost_and_stale_power_drops_rf_present():
     _run(build_master_tasks(hot), [])
     assert hot.state.banner == "Hot switch"
 
+    reported = MasterApp()
+    reported.now_ms = 200
+    _run(build_master_tasks(reported), [])
+    reported_sent = decode_frames(bytes(reported.tx))[0][0]
+    reported.tx.clear()
+    reported.state.banner = "Hot switch"
+    _load(
+        reported.rs485,
+        reported.rs485_flags,
+        encode_frame(
+            Frame(2, 1, reported_sent.sequence, Command.SND, pack_status(_reading(1.1))),
+        ),
+    )
+    _run(build_master_tasks(reported), [])
+    assert reported.state.banner == "Hot switch"
+    assert reported.state.forward_w == 1.1
+    _load(reported.rs485, reported.rs485_flags, b"\x00")
+    _run(build_master_tasks(reported), [])
+    assert reported.state.banner == "Hot switch"
+    reported.now_ms = 400
+    _run(build_master_tasks(reported), [])
+    hhh = decode_frames(bytes(reported.tx))[0][0]
+    reported.tx.clear()
+    _load(
+        reported.rs485,
+        reported.rs485_flags,
+        encode_frame(Frame(2, 1, hhh.sequence, Command.ACK, bytes([Command.HHH.byte]))),
+    )
+    _run(build_master_tasks(reported), [])
+    assert reported.state.banner == "Hot switch"
+
     stale = MasterApp()
     stale.state.forward_w = 1.1
     stale.state.power_sample_ms = 0
@@ -65,6 +122,26 @@ def test_ack_clears_communication_lost_and_stale_power_drops_rf_present():
     stale.state.forward_w = 1.0
     write_leds(stale.state, stale.olat, stale.now_ms)
     assert stale.olat.port_b & (1 << 6) == 0
+
+    from master import config as master_config
+
+    fresh = MasterApp()
+    fresh.now_ms = 5000
+    _run(build_master_tasks(fresh), [])
+    fresh_sent = decode_frames(bytes(fresh.tx))[0][0]
+    fresh.tx.clear()
+    _load(
+        fresh.rs485,
+        fresh.rs485_flags,
+        encode_frame(Frame(2, 1, fresh_sent.sequence, Command.SND, pack_status(_reading(1.1)))),
+    )
+    _run(build_master_tasks(fresh), [])
+    assert fresh.state.power_sample_ms == 5000
+    assert fresh.olat.port_b & (1 << 6)
+    fresh.menu.open_menu()
+    fresh.now_ms = 5000 + master_config.POWER_STALE_MS
+    _run(build_master_tasks(fresh), [])
+    assert fresh.olat.port_b & (1 << 6) == 0
 
 
 def test_mcp_gpio_press_enqueues_tune():
