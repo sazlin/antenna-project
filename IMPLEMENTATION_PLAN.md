@@ -1263,7 +1263,7 @@ Commit: `docs: explain each module and function for the operator`
 
 ### Task 55. Assumptions document
 
-- [ ] Files: `docs/ASSUMPTIONS.md`, `tests/test_docs_assumptions.py`.
+- [x] Files: `docs/ASSUMPTIONS.md`, `tests/test_docs_assumptions.py`.
 
 Failing test: the file starts with the eight client decision headings in order, each containing the assumed answer text `more than 1 W`, `Keep the current antenna`, `ukoda/ATU-100-remote`, `TST0/TST1`, `Antenna Select`, `5 buttons`, `100 ms`, and `GPIO 23, 24, 25 or 29`. Later sections contain the ids A1 through A21, the name `Forward`, and the names `REPLY_TIMEOUT_MS`, `REMOTE_SILENCE_MS`, `ATU_MODE`, and `common/hal.py`. A12 in that file says `Power` is antenna watts when efficiency is present and that antenna watts are not forward watts times efficiency. A21 says `order` is stored.
 
