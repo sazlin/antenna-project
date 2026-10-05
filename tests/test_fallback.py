@@ -7,6 +7,63 @@ from remote.button_emulation import Fallback, OptoBank
 from remote.tasks import PowerView, RemoteApp, build_remote_tasks, dispatch_frame
 
 
+def test_fallback_tune_holds_400_ms_when_the_clock_is_not_zero():
+    from common.hal import note_rx_byte
+    from common.mcp23017 import MCP23017, RelayLatch
+    from common.scheduler import run_once
+
+    mem: dict[tuple[int, int], int] = {}
+
+    class Bus:
+        def writeto_mem(self, addr, reg, buf):
+            mem[(addr, reg)] = buf[0]
+
+        def readfrom_mem(self, addr, reg, nbytes):
+            return bytes([mem.get((addr, reg), 0)])
+
+    def app_at(now_ms: int):
+        board = RemoteApp()
+        board.mode = "fallback"
+        board.latch = RelayLatch(MCP23017(Bus(), 0x20))
+        board.now_ms = now_ms
+        return board
+
+    def pulse(command: Command, start: int, hold: int, bit: int, sequence: int) -> None:
+        board = app_at(start)
+        for byte in encode_frame(Frame(1, 2, sequence, command, b"")):
+            note_rx_byte(board.rs485, board.rs485_flags, byte)
+        run_once(build_remote_tasks(board), interrupt=lambda: None, watchdog=lambda: None)
+        assert mem[(0x20, 0x15)] & 0x70 == bit
+        assert mem[(0x20, 0x15)] & 0x0F == 0
+        board.now_ms = start + hold
+        run_once(build_remote_tasks(board), interrupt=lambda: None, watchdog=lambda: None)
+        assert mem[(0x20, 0x15)] & bit == 0
+
+    pulse(Command.TUN, 5000, 400, 0x10, 1)
+    pulse(Command.AM0, 6000, 80, 0x20, 2)
+    pulse(Command.BYP1, 7000, 80, 0x40, 3)
+    pulse(Command.RST, 8000, 100, 0x10, 4)
+    again = app_at(9000)
+    for byte in encode_frame(Frame(1, 2, 1, Command.AM0, b"")):
+        note_rx_byte(again.rs485, again.rs485_flags, byte)
+    run_once(build_remote_tasks(again), interrupt=lambda: None, watchdog=lambda: None)
+    again.now_ms = 9080
+    run_once(build_remote_tasks(again), interrupt=lambda: None, watchdog=lambda: None)
+    assert mem[(0x20, 0x15)] & 0x20 == 0
+    for byte in encode_frame(Frame(1, 2, 2, Command.AM0, b"")):
+        note_rx_byte(again.rs485, again.rs485_flags, byte)
+    run_once(build_remote_tasks(again), interrupt=lambda: None, watchdog=lambda: None)
+    assert mem[(0x20, 0x15)] & 0x20 == 0
+    serial = RemoteApp()
+    serial.mode = "serial"
+    serial.latch = RelayLatch(MCP23017(Bus(), 0x20))
+    for byte in encode_frame(Frame(1, 2, 1, Command.TUN, b"")):
+        note_rx_byte(serial.rs485, serial.rs485_flags, byte)
+    run_once(build_remote_tasks(serial), interrupt=lambda: None, watchdog=lambda: None)
+    assert serial.port_writes == [b'{"Tune":true}\n']
+    assert mem.get((0x20, 0x15), 0) & 0x70 == 0
+
+
 def _pulse(command: Command, hold_ms: int, bit: int, sequence: int = 1) -> None:
     from common.hal import note_rx_byte
     from common.scheduler import run_once

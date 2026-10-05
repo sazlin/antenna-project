@@ -95,6 +95,7 @@ def dispatch_frame(
     test_mode: TestMode,
     fallback: Fallback,
     opto: OptoBank,
+    now_ms: int = 0,
 ) -> bytes | None:
     """Run one master frame on the hardware, then ACK or ERR."""
     link.execute_tuner = True
@@ -109,27 +110,29 @@ def dispatch_frame(
         return link.finish(action)
     if command is Command.RST:
         _clear_coils(latch, state, "reset")
-        _send_reset(port, mode, fallback, opto)
+        _send_reset(port, mode, fallback, opto, now_ms)
         return link.finish(action)
     if mode == "fallback":
-        return _fallback_command(link, action, fallback, opto)
+        return _fallback_command(link, action, fallback, opto, now_ms)
     return _serial_command(link, action, port, test_mode)
 
 
-def _send_reset(port: object, mode: str, fallback: Fallback, opto: OptoBank) -> None:
+def _send_reset(port: object, mode: str, fallback: Fallback, opto: OptoBank, now_ms: int) -> None:
     """Serial reset is one JSON field. Fallback reset is a short Tune press."""
     if mode == "fallback":
-        opto.drive(fallback.press_for(Command.RST), 0)
+        opto.drive(fallback.press_for(Command.RST), now_ms)
         return
     port.write(b'{"Reset":true}\n')
 
 
-def _fallback_command(link: object, action: Action, fallback: Fallback, opto: OptoBank) -> bytes:
+def _fallback_command(
+    link: object, action: Action, fallback: Fallback, opto: OptoBank, now_ms: int
+) -> bytes:
     """Press a stock button, or ERR when fallback has no reading to give."""
     presses = fallback.press_for(action.command)
     if presses is ErrorCode.DATA_NOT_AVAILABLE:
         return link.fail(action.command, ErrorCode.DATA_NOT_AVAILABLE, 2)
-    opto.drive(presses, 0)
+    opto.drive(presses, now_ms)
     return link.finish(action)
 
 
@@ -382,7 +385,9 @@ def _remote_drain(app: RemoteApp) -> None:
         test_mode=app.test_mode,
         fallback=app.fallback,
         opto=app.opto,
+        now_ms=app.now_ms,
     )
+    _copy_optos(app)
     app.last_accept_ms = app.now_ms
     app.state.link_up = True
     if app.state.banner == "Communication Lost":
@@ -410,9 +415,22 @@ def _remote_poll_atu(app: RemoteApp) -> None:
     app.shared["antenna_w"] = app.state.antenna_w
 
 
+def _copy_optos(app: RemoteApp) -> None:
+    """Copy GPB4..GPB6 onto the expander. Serial mode does not touch those bits."""
+    if app.mode != "fallback":
+        return
+    chip = getattr(app.latch, "chip", None)
+    if chip is None:
+        return
+    port_a, port_b = chip.read_olat()
+    merged = (port_b & ~0x70) | (app.opto.value & 0x70)
+    chip.write_olat(port_a, merged)
+
+
 def _remote_optos(app: RemoteApp) -> None:
     """Drop a fallback opto bit when its press time has elapsed."""
     app.opto.service_optos(app.now_ms)
+    _copy_optos(app)
 
 
 def _remote_publish(app: RemoteApp) -> None:
