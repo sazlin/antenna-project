@@ -1,9 +1,45 @@
 from common.commands import Command
+from common.errors import ErrorCode
 from common.protocol import Action, Frame, RemoteLink, decode_frames, encode_frame
 
 
 def _frame(command: Command, sequence: int, payload: bytes = b"") -> bytes:
     return encode_frame(Frame(1, 2, sequence, command, payload))
+
+
+def test_rpt_resends_previous_ack():
+    link = RemoteLink()
+    _reply, action = link.on_bytes(_frame(Command.AT3, 4))
+    link.finish(action)
+    reply, action = link.on_bytes(_frame(Command.RPT, 5))
+    assert action is None
+    frames, _leftover = decode_frames(reply)
+    assert frames[0].sequence == 5
+    assert frames[0].command is Command.ACK
+    assert frames[0].payload == bytes([0x13])
+    again, again_action = link.on_bytes(_frame(Command.RPT, 5))
+    assert again == reply
+    assert again_action is None
+
+
+def test_rpt_without_cache_is_data_not_available():
+    link = RemoteLink()
+    reply, action = link.on_bytes(_frame(Command.RPT, 1))
+    assert action is None
+    frames, _leftover = decode_frames(reply)
+    assert frames[0].command is Command.ERR
+    assert frames[0].payload[0] == ErrorCode.DATA_NOT_AVAILABLE
+    assert frames[0].payload[1] == 2
+    assert frames[0].payload[2] == 0x03
+
+
+def test_sta_without_status_is_data_not_available():
+    link = RemoteLink()
+    reply, action = link.on_bytes(_frame(Command.STA, 8))
+    assert action is None
+    frames, _leftover = decode_frames(reply)
+    assert frames[0].command is Command.ERR
+    assert list(frames[0].payload) == [2, 2, 0x04]
 
 
 def test_status_handshake_survives_at2():

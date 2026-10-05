@@ -8,6 +8,7 @@ import struct
 from dataclasses import dataclass
 
 from common.commands import CODE_TO_COMMAND, Command
+from common.errors import ErrorCode
 
 START = 0x7E
 END = 0x7F
@@ -434,6 +435,14 @@ class RemoteLink:
         if frame.command in _ANTENNA:
             self._open_sequence = frame.sequence
             return None, Action(frame.command, _ANTENNA[frame.command])
+        if frame.command is Command.RPT:
+            cached = self._cached_command()
+            if cached is None:
+                return self._unavailable(frame), None
+            command, payload = cached
+            return self._reply(frame, command, payload), None
+        if frame.command is Command.STA and self._pending_status is None:
+            return self._unavailable(frame), None
         if frame.command is Command.HHH:
             if self._pending_status is not None:
                 return self._reply(frame, Command.RS, b""), None
@@ -447,6 +456,18 @@ class RemoteLink:
         if frame.command is Command.RCVD:
             return self._reply(frame, Command.ACK, bytes([Command.RCVD.byte])), None
         return None, None
+
+    def _cached_command(self) -> tuple[Command, bytes] | None:
+        """Return the command and payload of the last reply, if one exists."""
+        if self._cached is None:
+            return None
+        frames, _leftover = decode_frames(self._cached)
+        return frames[0].command, frames[0].payload
+
+    def _unavailable(self, frame: Frame) -> bytes:
+        """ERR when RPT or STA has nothing to send. Source is the remote."""
+        payload = bytes([ErrorCode.DATA_NOT_AVAILABLE, 2, frame.command.byte])
+        return self._reply(frame, Command.ERR, payload)
 
     def _reply(self, frame: Frame, command: Command, payload: bytes) -> bytes:
         """Send one reply on the sequence the master just used, and cache it."""

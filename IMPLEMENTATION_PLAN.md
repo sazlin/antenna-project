@@ -496,7 +496,7 @@ Commit: `feat: map RS and RR onto the polled status transfer`
 
 ### Task 15. RPT resends the previous reply
 
-- [ ] Files: `common/protocol.py`, `tests/test_link_remote.py`.
+- [x] Files: `common/protocol.py`, `tests/test_link_remote.py`.
 
 Failing test: finish an AT3 so a cached ACK exists. A new sequence whose command is RPT returns a frame with the new sequence, command ACK, payload byte `0x13`, and action None. That cache stays in place. This test does not clear it.
 
