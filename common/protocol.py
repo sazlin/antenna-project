@@ -118,6 +118,7 @@ class MasterLink:
         self._status: Status | None = None
         self._buffer = bytearray()
         self._queue: list[tuple[Command, bytes]] = []
+        self.last_err: Frame | None = None
 
     def enqueue(self, command: Command, payload: bytes = b"") -> None:
         """Queue a command to send on the next idle poll instead of HHH."""
@@ -190,6 +191,12 @@ class MasterLink:
     def _accept(self, frame: Frame) -> None:
         """Match a reply to the open sequence and advance the status handshake."""
         pending = self._pending
+        if frame.command is Command.ERR:
+            self.last_err = frame
+            self.log.append(f"RX {_rx_label(frame)}")
+            if pending is not None and frame.sequence == pending.sequence:
+                self._release(pending.sent_ms)
+            return
         if pending is None or frame.sequence != pending.sequence:
             return
         self.log.append(f"RX {_rx_label(frame)}")

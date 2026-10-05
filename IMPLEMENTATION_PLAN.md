@@ -1213,7 +1213,7 @@ Commit: `feat: run the remote and master task lists`
 
 ### Task 65. Deliver an ATU timeout to the master
 
-- [ ] Files: `remote/tasks.py`, `master/tasks.py`, `tests/test_errors.py`.
+- [x] Files: `remote/tasks.py`, `master/tasks.py`, `tests/test_errors.py`.
 
 This task follows tasks 46, 53, and 64. Task 43 already built `make_error`, `propagate`, and `banner`. Do not move those tests here.
 

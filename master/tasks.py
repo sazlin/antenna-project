@@ -3,6 +3,7 @@
 
 from common.commands import Command
 from common.display import publish
+from common.errors import ErrorCode
 from common.hal import ByteRing, Flags, drain_rx
 from common.menu import Menu
 from common.protocol import MasterLink
@@ -143,6 +144,16 @@ class MasterApp:
         on_link_lost(self.state, [])
 
 
+def _apply_err(app: MasterApp) -> None:
+    """An ERR from the remote sets the banner and the Error LED."""
+    frame = app.link.last_err
+    if frame is None or not frame.payload:
+        return
+    app.state.banner = ErrorCode(frame.payload[0]).nature
+    write_leds(app.state, app.olat)
+    app.link.last_err = None
+
+
 def _master_drain(app: MasterApp) -> None:
     """Read one remote reply into the master row."""
     data = drain_rx(app.rs485, app.rs485_flags)
@@ -150,6 +161,7 @@ def _master_drain(app: MasterApp) -> None:
         return
     buf = bytearray(data)
     drain_rs485(app.link, buf, app.state, app.shared.get("antenna_w"))
+    _apply_err(app)
 
 
 def _master_poll(app: MasterApp) -> None:

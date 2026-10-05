@@ -8,7 +8,7 @@ from common.display import publish
 from common.errors import ErrorCode, RelayFault
 from common.hal import ByteRing, Flags, drain_rx
 from common.menu import Menu
-from common.protocol import Action, RemoteLink, Status, pack_status
+from common.protocol import Action, Frame, RemoteLink, Status, encode_frame, pack_status
 from common.state import LinkState, commit
 from remote import config
 from remote.atu_link import AtuLink, TestMode, encode_command
@@ -58,6 +58,7 @@ def apply_from_link(action: Action, latch: object, state: LinkState, power: Powe
         safe_off(latch, "fault")
         state.antenna = 0
         state.relay_mask = 0
+        state.banner = "Relay fault"
         return ApplyReply("err", ErrorCode.RELAY_FAULT)
     if result is not None:
         return ApplyReply("err", result)
@@ -172,9 +173,11 @@ def drain_rs485(
     return reply
 
 
-def poll_atu(atu: AtuLink, state: LinkState, link: object, now_ms: int) -> None:
+def poll_atu(atu: AtuLink, state: LinkState, link: object, now_ms: int) -> bytes | None:
     """Commit a parsed tuner object once, then offer it on the next idle poll."""
-    atu.poll(now_ms)
+    offline = atu.poll(now_ms)
+    if offline is ErrorCode.RESOURCE_OFFLINE:
+        return encode_err(ErrorCode.RESOURCE_OFFLINE, 3, Command.STA)
     status = atu.last_status
     if status is None or atu._announced:
         return
@@ -359,9 +362,15 @@ def _remote_drain(app: RemoteApp) -> None:
     )
     app.last_accept_ms = app.now_ms
     app.state.link_up = True
-    app.state.banner = ""
+    if app.state.banner == "Communication Lost":
+        app.state.banner = ""
     if reply:
         app.tx.extend(reply)
+
+
+def encode_err(code: ErrorCode, source: int, command: Command) -> bytes:
+    """Build an ERR frame the master can drain. Source 3 is the ATU."""
+    return encode_frame(Frame(2, 1, 1, Command.ERR, bytes([int(code), source, command.byte])))
 
 
 def _remote_poll_atu(app: RemoteApp) -> None:
@@ -370,7 +379,9 @@ def _remote_poll_atu(app: RemoteApp) -> None:
     data = drain_rx(app.atu_ring, app.atu_flags)
     if data:
         app.atu.feed(data)
-    poll_atu(app.atu, app.state, app.link, app.now_ms)
+    err = poll_atu(app.atu, app.state, app.link, app.now_ms)
+    if err:
+        app.tx.extend(err)
     app.shared["antenna_w"] = app.state.antenna_w
 
 
