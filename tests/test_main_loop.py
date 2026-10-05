@@ -409,6 +409,68 @@ def test_remote_silence_sets_communication_lost():
     assert app.state.link_up is True
 
 
+def test_master_efficiency_screen_comes_from_the_snd_payload():
+    tuned = (
+        "{\n"
+        '  "Auto": true,\n'
+        '  "Bypass": false,\n'
+        '  "efficency": 90,\n'
+        '  "Power": 9.0,\n'
+        '  "Forward": 10.0,\n'
+        '  "SWR": 1.10,\n'
+        '  "Order": "LC"\n'
+        "}\n"
+    ).encode()
+    remote = RemoteApp()
+    master = MasterApp()
+    remote.now_ms = 1000
+    master.now_ms = 1000
+    _load(remote.atu_ring, remote.atu_flags, tuned)
+    _run(build_remote_tasks(remote), [])
+
+    def move() -> None:
+        _run(build_master_tasks(master), [])
+        if master.tx:
+            _load(remote.rs485, remote.rs485_flags, bytes(master.tx))
+            master.tx.clear()
+        _run(build_remote_tasks(remote), [])
+        if remote.tx:
+            _load(master.rs485, master.rs485_flags, bytes(remote.tx))
+            remote.tx.clear()
+        _run(build_master_tasks(master), [])
+
+    for tick in (1200, 1400, 1600, 1800):
+        remote.now_ms = tick
+        master.now_ms = tick
+        move()
+    assert master.shared.get("antenna_w") is None or "antenna_w" not in master.shared
+    state = master.state
+    lines = screen_lines(
+        Reading(
+            state.forward_w or 0,
+            state.swr or 0,
+            state.inductance_nh or 0,
+            state.capacitance_pf or 0,
+            bool(state.auto),
+            bool(state.bypass),
+            state.order or "LC",
+            state.efficiency_pct,
+            state.antenna_w,
+        )
+    )
+    assert lines == ("10.0W          .", "1.10", "9.0W", "90%")
+    bare = (
+        "{\n"
+        '  "Forward": 10.0,\n'
+        '  "SWR": 1.10,\n'
+        '  "Inductance": 1250,\n'
+        '  "Capacitance": 150,\n'
+        '  "Order": "CL"\n'
+        "}\n"
+    ).encode()
+    _status_case(bare, "CL", 0x40, ("10.0W           ", "1.10", "150pF", "1.25uH"))
+
+
 def _pump(master: MasterApp, remote: RemoteApp) -> None:
     _run(build_master_tasks(master), [])
     if master.tx:
@@ -418,21 +480,19 @@ def _pump(master: MasterApp, remote: RemoteApp) -> None:
     if remote.tx:
         _load(master.rs485, master.rs485_flags, bytes(remote.tx))
         remote.tx.clear()
-    master.shared["antenna_w"] = remote.shared.get("antenna_w")
     _run(build_master_tasks(master), [])
 
 
 def _status_case(body: bytes, order: str, bit6: int, expected: tuple[str, str, str, str]) -> None:
     remote = RemoteApp()
     master = MasterApp()
-    master.shared = remote.shared
     remote.now_ms = 1000
     master.now_ms = 1000
     _load(remote.atu_ring, remote.atu_flags, body)
     _run(build_remote_tasks(remote), [])
     assert remote.state.order == order
     assert remote.state.power_sample_ms == 1000
-    assert len(remote.link._pending_status) == 13
+    assert len(remote.link._pending_status) == 15
     assert (remote.link._pending_status[0] & 0x40) == bit6
     for tick in (1200, 1400, 1600, 1800):
         remote.now_ms = tick
@@ -454,6 +514,10 @@ def _status_case(body: bytes, order: str, bit6: int, expected: tuple[str, str, s
     )
     assert state.order == order
     assert lines == expected
+    if expected[2].endswith("W"):
+        assert state.antenna_w is not None
+    else:
+        assert state.antenna_w is None
 
 
 def test_atu_status_is_committed_and_sent():

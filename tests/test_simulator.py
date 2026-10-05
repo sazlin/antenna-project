@@ -99,12 +99,7 @@ class Exchange:
                 if reply:
                     self.to_master.extend(reply)
             if self.to_master:
-                master_drain(
-                    self.master,
-                    self.to_master,
-                    self.master_state,
-                    self.remote_state.antenna_w,
-                )
+                master_drain(self.master, self.to_master, self.master_state)
             if self.master._phase in ("saw_rs", "saw_snd"):
                 maybe_poll(self.master, now_ms, self.to_remote)
             if not self.to_remote and not self.to_master and self.master._phase == "idle":

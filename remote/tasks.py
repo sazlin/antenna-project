@@ -245,6 +245,7 @@ def poll_atu(atu: AtuLink, state: LinkState, link: object, now_ms: int) -> bytes
                 antenna=state.antenna,
                 error_code=0,
                 error_source=0,
+                antenna_w=status.antenna_w,
             )
         )
     )
@@ -472,7 +473,6 @@ def _remote_poll_atu(app: RemoteApp) -> None:
             encode_frame(Frame(2, 1, sequence, Command.ERR, bytes([int(err), 3, app.atu._command.byte])))
         )
     app.power = _power_from_state(app)
-    app.shared["antenna_w"] = app.state.antenna_w
 
 
 def _copy_optos(app: RemoteApp) -> None:

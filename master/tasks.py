@@ -98,8 +98,8 @@ def maybe_poll(link: MasterLink, now_ms: int, tx: bytearray) -> None:
         tx.extend(raw)
 
 
-def drain_rs485(link: MasterLink, rx: bytearray, state: LinkState, antenna_w: float | None = None) -> None:
-    """Read remote frames. A SND updates the master row, including antenna watts when known."""
+def drain_rs485(link: MasterLink, rx: bytearray, state: LinkState) -> None:
+    """Read remote frames. Antenna watts come from the SND payload."""
     if not rx:
         return
     data = bytes(rx)
@@ -115,7 +115,7 @@ def drain_rs485(link: MasterLink, rx: bytearray, state: LinkState, antenna_w: fl
         inductance_nh=reading.inductance_nh,
         capacitance_pf=reading.capacitance_pf,
         efficiency_pct=reading.efficiency_pct if reading.efficiency_valid else None,
-        antenna_w=antenna_w if reading.efficiency_valid else None,
+        antenna_w=reading.antenna_w,
         auto=reading.auto,
         bypass=reading.bypass,
         order=reading.order,
@@ -178,7 +178,7 @@ def _master_drain(app: MasterApp) -> None:
     if not data:
         return
     buf = bytearray(data)
-    drain_rs485(app.link, buf, app.state, app.shared.get("antenna_w"))
+    drain_rs485(app.link, buf, app.state)
     if app.link.saw_ack and app.state.banner == "Communication Lost":
         app.state.link_up = True
         app.state.banner = ""

@@ -14,7 +14,7 @@ START = 0x7E
 END = 0x7F
 ESCAPE = 0x7D
 _SPECIAL = (START, END, ESCAPE)
-_STATUS = struct.Struct("<BHHHHBBBB")
+_STATUS = struct.Struct("<BHHHHBBBBH")
 _FLAG_AUTO = 0x01
 _FLAG_BYPASS = 0x02
 _FLAG_ATU = 0x04
@@ -26,7 +26,7 @@ _FLAG_CL = 0x40
 
 @dataclass(frozen=True)
 class Status:
-    """Tuner reading carried in a 13-byte SND payload."""
+    """Tuner reading carried in the SND payload, including antenna watts."""
 
     auto: bool
     bypass: bool
@@ -43,6 +43,7 @@ class Status:
     antenna: int
     error_code: int
     error_source: int
+    antenna_w: float | None = None
 
 
 def _status_flags(status: Status) -> int:
@@ -66,7 +67,8 @@ def _status_flags(status: Status) -> int:
 
 
 def pack_status(status: Status) -> bytes:
-    """Pack watts, SWR, L, and C into the fixed 13-byte status payload."""
+    """Pack watts, SWR, L, C, and antenna watts into the SND payload."""
+    antenna_watts = 0 if status.antenna_w is None else int(round(status.antenna_w * 10))
     return _STATUS.pack(
         _status_flags(status),
         int(round(status.forward_w * 10)),
@@ -77,6 +79,7 @@ def pack_status(status: Status) -> bytes:
         status.antenna,
         status.error_code,
         status.error_source,
+        antenna_watts,
     )
 
 
@@ -233,9 +236,10 @@ def _rx_label(frame: Frame) -> str:
 
 def unpack_status(data: bytes) -> Status:
     """Restore a status payload. Raise ValueError when the buffer is short."""
-    if len(data) != 13:
-        raise ValueError(f"status payload is {len(data)} bytes, need 13")
-    flags, forward, swr, inductance, capacitance, efficiency, antenna, error, source = _STATUS.unpack(data)
+    if len(data) != 15:
+        raise ValueError(f"status payload is {len(data)} bytes, need 15")
+    flags, forward, swr, inductance, capacitance, efficiency, antenna, error, source, antenna_watts = _STATUS.unpack(data)
+    antenna_w = antenna_watts / 10 if flags & _FLAG_EFFICIENCY else None
     return Status(
         auto=bool(flags & _FLAG_AUTO),
         bypass=bool(flags & _FLAG_BYPASS),
@@ -252,6 +256,7 @@ def unpack_status(data: bytes) -> Status:
         antenna=antenna,
         error_code=error,
         error_source=source,
+        antenna_w=antenna_w,
     )
 
 

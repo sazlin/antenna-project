@@ -55,7 +55,7 @@ Hot switch ERR example: payload `06 02 11`. Code 6 is hot switch, source 2 is th
 
 ## Status payload
 
-SND payload is 13 bytes, little-endian multi-byte fields.
+SND payload is 15 bytes, little-endian multi-byte fields.
 
 1. Flags. bit0 auto, bit1 bypass, bit2 atu link up, bit3 test mode, bit4 efficiency valid, bit5 power valid, bit6 set when Order is CL and clear when Order is LC.
 2. Forward watts times 10, uint16.
@@ -66,6 +66,7 @@ SND payload is 13 bytes, little-endian multi-byte fields.
 7. Selected antenna 0..4, uint8.
 8. Error code, uint8, 0 if none.
 9. Error source, uint8.
+10. Antenna watts times 10, uint16. This is the `Power` field. When the efficiency flag is clear, the master stores antenna watts as none and shows L and C. Do not multiply forward watts by efficiency.
 
 Error codes: Failed to Execute 1, Data Not Available 2, Resource offline 3, Communication Lost 4, Data Corrupted 5, Hot switch 6, Relay fault 7.
 

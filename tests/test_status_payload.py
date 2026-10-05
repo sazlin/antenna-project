@@ -18,12 +18,13 @@ def _reading(order: str) -> Status:
         antenna=2,
         error_code=0,
         error_source=0,
+        antenna_w=99.0,
     )
 
 
 def test_status_payload_round_trip():
     packed = pack_status(_reading("LC"))
-    assert len(packed) == 13
+    assert len(packed) == 15
     assert packed[0] == 0b00110101
     assert int.from_bytes(packed[1:3], "little") == 1000
     assert int.from_bytes(packed[3:5], "little") == 115
@@ -32,7 +33,7 @@ def test_status_payload_round_trip():
     assert restored.order == "LC"
 
     swapped = pack_status(_reading("CL"))
-    assert len(swapped) == 13
+    assert len(swapped) == 15
     assert swapped[0] & 0x40
     assert unpack_status(swapped).order == "CL"
     cleared = bytes([swapped[0] & ~0x40]) + swapped[1:]
