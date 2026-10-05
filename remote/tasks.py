@@ -446,13 +446,14 @@ def _remote_drain(app: RemoteApp) -> None:
         opto=app.opto,
         now_ms=app.now_ms,
     )
+    if reply is None:
+        return
     _copy_optos(app)
     app.last_accept_ms = app.now_ms
     app.state.link_up = True
     if app.state.banner == "Communication Lost":
         app.state.banner = ""
-    if reply:
-        app.tx.extend(reply)
+    app.tx.extend(reply)
     _flush_rs485(app)
 
 

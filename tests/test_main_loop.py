@@ -548,6 +548,29 @@ def test_remote_silence_sets_communication_lost():
     assert app.state.link_up is True
 
 
+def test_noise_byte_does_not_clear_communication_lost():
+    app = RemoteApp()
+    app.state.antenna = 3
+    app.state.banner = "Communication Lost"
+    app.state.link_up = False
+    app.latch.value = 0b0100
+    app.last_accept_ms = 0
+    app.now_ms = 2000
+    _load(app.rs485, app.rs485_flags, b"\x00")
+    _run(build_remote_tasks(app), [])
+    assert app.state.banner == "Communication Lost"
+    assert app.state.link_up is False
+    assert app.latch.value == 0b0100
+    assert app.latch.writes == []
+    assert app.last_accept_ms == 0
+    _load(app.rs485, app.rs485_flags, encode_frame(Frame(1, 2, 3, Command.HHH, b"")))
+    _run(build_remote_tasks(app), [])
+    assert app.state.banner == ""
+    assert app.state.link_up is True
+    assert app.latch.value == 0b0100
+    assert app.latch.writes == []
+
+
 def test_master_efficiency_screen_comes_from_the_snd_payload():
     tuned = (
         "{\n"
