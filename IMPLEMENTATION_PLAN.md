@@ -801,7 +801,7 @@ Commit: `feat: wait for the ukoda reply before sending again`
 
 ### Task 33. Test mode relay masks
 
-- [ ] Files: `remote/atu_link.py`, `tests/test_test_mode.py`.
+- [x] Files: `remote/atu_link.py`, `tests/test_test_mode.py`.
 
 Each test expects one mask. `TST1` on a new `TestMode()` returns no JSON and sets `active` true. The step starts at 0. TSC and TSL keep that step. They do not zero it.
 

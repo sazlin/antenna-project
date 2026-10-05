@@ -164,6 +164,48 @@ class AtuLink:
         return _status_from_object(obj)
 
 
+class TestMode:
+    """Direct L and C steps. Bit 7 is the CL/LC order bit and it is only on RelayC."""
+
+    def __init__(self, inductor_count: int = 7, capacitor_count: int = 7) -> None:
+        """Start out of test mode. Seven elements can count from 0 through 127."""
+        self.active = False
+        self.step = 0
+        self._bank = "L"
+        self._l_ceiling = (1 << inductor_count) - 1
+        self._c_ceiling = (1 << capacitor_count) - 1
+
+    def command(self, command: Command) -> bytes | None:
+        """Return one relay line, or None for TST1 which only enters the mode."""
+        if command is Command.TST1:
+            self.active = True
+            self.step = 0
+            return None
+        if command is Command.TST0:
+            self.active = False
+            return b'{"Reset":true}\n'
+        if command is Command.TSC:
+            self._bank = "C"
+            return self._line()
+        if command is Command.TSL:
+            self._bank = "L"
+            return self._line()
+        if command is Command.TUP:
+            ceiling = self._c_ceiling if self._bank == "C" else self._l_ceiling
+            self.step = min(ceiling, self.step + 1)
+            return self._line()
+        if command is Command.TDN:
+            self.step = max(0, self.step - 1)
+            return self._line()
+        return None
+
+    def _line(self) -> bytes:
+        """RelayI is the L step. RelayC is the C step with bit 7 set for LC order."""
+        if self._bank == "C":
+            return f'{{"RelayC":{self.step | 0x80}}}\n'.encode()
+        return f'{{"RelayI":{self.step}}}\n'.encode()
+
+
 def encode_command(command: Command) -> bytes:
     """Return the one-field ukoda line for a tuner command."""
     try:
