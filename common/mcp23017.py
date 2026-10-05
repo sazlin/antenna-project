@@ -44,6 +44,10 @@ class MCP23017:
         """Return the latched output bytes for port A and port B."""
         return self._read(_OLATA), self._read(_OLATB)
 
+    def read_gpio(self) -> tuple[int, int]:
+        """Read the pin levels. The interrupt task calls this after INTA or INTB."""
+        return self._read(0x12), self._read(0x13)
+
     def enable_interrupts(self) -> None:
         """Interrupt on the input pins. INT is open drain so both pins can share a wire."""
         self._write(_GPINTENA, self._iodir[0])
@@ -57,6 +61,46 @@ class MCP23017:
     def _read(self, reg: int) -> int:
         """One register read."""
         return self.i2c.readfrom_mem(self.address, reg, 1)[0]
+
+
+class OlatView:
+    """LED port that writes the expander latch and leaves relay and opto bits alone."""
+
+    def __init__(self, chip: MCP23017, role: str) -> None:
+        """Start from the latch the chip already holds."""
+        self.chip = chip
+        self.role = role
+        self._port_a, self._port_b = chip.read_olat()
+
+    @property
+    def port_a(self) -> int:
+        """Return the last port A byte."""
+        return self._port_a
+
+    @port_a.setter
+    def port_a(self, value: int) -> None:
+        """Remote LEDs are GPA5 and GPA6. Re-read port B so a coil write is not undone."""
+        self._port_a, self._port_b = self.chip.read_olat()
+        if self.role == "remote":
+            mask = (1 << 5) | (1 << 6)
+            value = (self._port_a & ~mask) | (value & mask)
+        self._port_a = value
+        self.chip.write_olat(self._port_a, self._port_b)
+
+    @property
+    def port_b(self) -> int:
+        """Return the last port B byte."""
+        return self._port_b
+
+    @port_b.setter
+    def port_b(self, value: int) -> None:
+        """Master LEDs are GPB2 through GPB6. Relay and opto bits stay as they were."""
+        if self.role != "master":
+            return
+        self._port_a, self._port_b = self.chip.read_olat()
+        mask = 0x7C
+        self._port_b = (self._port_b & ~mask) | (value & mask)
+        self.chip.write_olat(self._port_a, self._port_b)
 
 
 class RelayLatch:

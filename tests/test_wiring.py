@@ -58,6 +58,117 @@ def _bind() -> FakeMachine:
     return fake
 
 
+def test_uart_irq_and_tx_write_move_one_at2_frame():
+    from common.commands import Command
+    from common.protocol import Frame, decode_frames, encode_frame
+    from common.scheduler import run_once
+    from master.main import boot_devices as boot_master
+    from remote.main import boot_devices as boot_remote
+    from remote.tasks import build_remote_tasks
+
+    mem: dict[tuple[int, int], int] = {}
+    gpio_reads: list[int] = []
+
+    class Bus:
+        def writeto_mem(self, addr, reg, buf):
+            mem[(addr, reg)] = buf[0]
+
+        def readfrom_mem(self, addr, reg, nbytes):
+            if reg in (0x12, 0x13):
+                gpio_reads.append(reg)
+            return bytes([mem.get((addr, reg), 0)] * nbytes)
+
+        def writeto(self, addr, buf):
+            self.shown.append((addr, bytes(buf)))
+
+        def __init__(self):
+            self.shown: list[tuple[int, bytes]] = []
+
+    buses: list[Bus] = []
+
+    class UART:
+        def __init__(self, uart_id, baudrate=None, tx=None, rx=None, **kwargs):
+            self.id = uart_id
+            self.pending = bytearray()
+            self.written = bytearray()
+            self.handler = None
+
+        def irq(self, handler):
+            self.handler = handler
+
+        def any(self):
+            return len(self.pending)
+
+        def read(self, count):
+            chunk = bytes(self.pending[:count])
+            del self.pending[:count]
+            return chunk
+
+        def write(self, data):
+            self.written.extend(data)
+
+        def push(self, value):
+            self.pending.append(value)
+            self.handler(self)
+
+    class Pin:
+        def __init__(self, number, *args, **kwargs):
+            self.number = number
+            self.handler = None
+
+        def irq(self, handler):
+            self.handler = handler
+
+    uarts: list[UART] = []
+
+    class Machine:
+        def WDT(self, timeout):
+            return type("W", (), {"feed": lambda self: None})()
+
+        def Pin(self, number, *args, **kwargs):
+            return Pin(number)
+
+        def UART(self, uart_id, baudrate=None, tx=None, rx=None, **kwargs):
+            uart = UART(uart_id, baudrate, tx, rx)
+            uarts.append(uart)
+            return uart
+
+        def I2C(self, i2c_id, scl, sda, freq=400000):
+            bus = Bus()
+            buses.append(bus)
+            return bus
+
+    hal.bind(Machine())
+    try:
+        remote = boot_remote("remote")
+        uart0 = next(uart for uart in uarts if uart.id == 0)
+        for byte in encode_frame(Frame(1, 2, 1, Command.AT2, b"")):
+            uart0.push(byte)
+        run_once(build_remote_tasks(remote), interrupt=lambda: None, watchdog=lambda: None)
+        frames, _leftover = decode_frames(bytes(uart0.written))
+        assert frames[0].command is Command.ACK
+        assert frames[0].payload == bytes([0x12])
+        run_once(build_remote_tasks(remote), interrupt=lambda: None, watchdog=lambda: None)
+        assert remote.oled.shown
+        assert remote.oled.shown is not remote.panel.lines
+        remote.state.banner = "Communication Lost"
+        remote.state.link_up = False
+        run_once(build_remote_tasks(remote), interrupt=lambda: None, watchdog=lambda: None)
+        assert mem[(0x20, 0x14)] & (1 << 5) == 0
+        assert mem[(0x20, 0x14)] & (1 << 6)
+        uarts.clear()
+        master = boot_master("master")
+        master.state.banner = "Communication Lost"
+        master.state.link_up = False
+        run_once(master.tasks, interrupt=lambda: None, watchdog=lambda: None)
+        assert mem[(0x20, 0x15)] & (1 << 2) == 0
+        assert mem[(0x20, 0x15)] & (1 << 3)
+        assert master.oled.shown
+    finally:
+        hal.bind(None)
+        hal.start_watchdog(3000)
+
+
 def test_remote_boot_opens_uarts_from_config(monkeypatch=None):
     assert "machine" not in sys.modules or True
     saved = master_config.POLL_MS

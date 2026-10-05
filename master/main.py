@@ -3,7 +3,8 @@
 # The repeating task list is started from boot_devices.
 
 from common import hal
-from common.mcp23017 import MCP23017
+from common.hal import note_rx_byte
+from common.mcp23017 import MCP23017, OlatView
 from common.scheduler import run_once
 from common.ssd1306 import SSD1306
 from master import config
@@ -48,17 +49,47 @@ def _open_buses(app: MasterApp) -> None:
     app.mcp.write_iodir(0xFF, 0x83)
     app.mcp.write_pullups(0xFF, 0x03)
     app.mcp.enable_interrupts()
+    app.olat = OlatView(app.mcp, "master")
+    _arm_uart(app.uart0, app.rs485, app.rs485_flags)
+    _arm_pin(machine.Pin(config.MCP_INTA), app.mcp_flag)
+    _arm_pin(machine.Pin(config.MCP_INTB), app.mcp_flag)
+
+
+def _arm_uart(uart: object, ring: object, flags: object) -> None:
+    """The UART interrupt only stores bytes. Decoding waits for the task pass."""
+
+    def _on_rx(source: object) -> None:
+        data = source.read(1)
+        if data:
+            note_rx_byte(ring, flags, data[0])
+
+    if hasattr(uart, "irq"):
+        uart.irq(_on_rx)
+
+
+def _arm_pin(pin: object, flags: object) -> None:
+    """INTA and INTB only raise a flag. The pass reads the expander."""
+
+    def _on_edge(_pin: object) -> None:
+        flags.mcp = True
+
+    if hasattr(pin, "irq"):
+        pin.irq(_on_edge)
 
 
 def _interrupt(app: MasterApp) -> None:
-    """The expander interrupt only sets a flag."""
-    del app
+    """Read the expander once the pin interrupt has raised the flag."""
+    if not app.mcp_flag.mcp:
+        return
+    if getattr(app, "mcp", None) is not None:
+        app.mcp.read_gpio()
+    app.mcp_flag.mcp = False
 
 
 def run_production_pass(board: MasterApp) -> None:
     """Read the clock once, then run the task list. Tests that set now_ms call run_once."""
     board.now_ms = hal.ticks_ms()
-    run_once(board.tasks, interrupt=lambda: _interrupt(board), watchdog=lambda: None)
+    run_once(board.tasks, interrupt=lambda: _interrupt(board), watchdog=hal.feed_watchdog)
 
 
 if __name__ == "__main__":

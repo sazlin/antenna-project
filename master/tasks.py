@@ -134,6 +134,7 @@ class MasterApp:
         self.shared: dict[str, float | None] = {}
         self.panel = type("Panel", (), {"lines": None, "show_lines": lambda self, lines: setattr(self, "lines", lines)})()
         self.olat = type("Olat", (), {"port_a": 0, "port_b": 0})()
+        self.mcp_flag = Flags()
         self._announced_loss = False
 
     def note_loss(self) -> None:
@@ -164,17 +165,28 @@ def _master_drain(app: MasterApp) -> None:
     _apply_err(app)
 
 
+def _flush_rs485(app: MasterApp) -> None:
+    """Send new poll bytes on UART0, then clear them."""
+    uart = getattr(app, "uart0", None)
+    if uart is None or not hasattr(uart, "write") or not app.tx:
+        return
+    uart.write(bytes(app.tx))
+    app.tx.clear()
+
+
 def _master_poll(app: MasterApp) -> None:
     """Send the queued command or HHH. Link loss only sets the banner."""
     maybe_poll(app.link, app.now_ms, app.tx)
+    _flush_rs485(app)
     if app.link.link_lost:
         app.note_loss()
 
 
 def _master_publish(app: MasterApp) -> None:
-    """Draw the master screen and LEDs."""
+    """Draw the SSD1306 when it is open, otherwise the memory panel."""
     app.publishes += 1
-    publish_display(app.state, app.panel, app.olat)
+    panel = getattr(app, "oled", None) or app.panel
+    publish_display(app.state, panel, app.olat)
 
 
 def _master_buttons(app: MasterApp) -> None:

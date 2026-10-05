@@ -338,8 +338,20 @@ class RemoteApp:
         self.olat = _Olat()
 
     def write(self, data: bytes) -> None:
-        """AtuLink uses this as the UART write."""
+        """AtuLink uses this as the UART write. UART1 gets the same bytes."""
         self.port_writes.append(data)
+        uart = getattr(self, "uart1", None)
+        if uart is not None and hasattr(uart, "write"):
+            uart.write(data)
+
+
+def _flush_rs485(app: RemoteApp) -> None:
+    """Send the reply bytes once, then drop them so the next pass does not repeat them."""
+    uart = getattr(app, "uart0", None)
+    if uart is None or not hasattr(uart, "write") or not app.tx:
+        return
+    uart.write(bytes(app.tx))
+    app.tx.clear()
 
 
 def _power_from_state(app: RemoteApp) -> PowerView:
@@ -377,6 +389,7 @@ def _remote_drain(app: RemoteApp) -> None:
         app.state.banner = ""
     if reply:
         app.tx.extend(reply)
+    _flush_rs485(app)
 
 
 def encode_err(code: ErrorCode, source: int, command: Command) -> bytes:
@@ -403,9 +416,10 @@ def _remote_optos(app: RemoteApp) -> None:
 
 
 def _remote_publish(app: RemoteApp) -> None:
-    """Draw the screen and the two remote LEDs."""
+    """Draw the SSD1306 when it is open, otherwise the memory panel."""
     app.publishes += 1
-    publish_display(app.state, app.panel, app.olat)
+    panel = getattr(app, "oled", None) or app.panel
+    publish_display(app.state, panel, app.olat)
 
 
 def _remote_buttons(app: RemoteApp) -> None:
