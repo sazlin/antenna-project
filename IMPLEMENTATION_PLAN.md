@@ -558,7 +558,7 @@ Commit: `feat: keep relays commanded off after F86 until RST`
 
 ### Task 19. ERR frame carries code, source, and command
 
-- [ ] Files: `common/protocol.py`, `common/errors.py`, `tests/test_err_frame.py`.
+- [x] Files: `common/protocol.py`, `common/errors.py`, `tests/test_err_frame.py`.
 
 Failing test: `RemoteLink.fail(Command.AT1, ErrorCode.HOT_SWITCH, source=2)` returns an ERR frame, sequence unchanged, payload `bytes([6, 2, 0x11])`. `ErrorCode.COMMUNICATION_LOST.nature` equals `Communication Lost`. Every spec nature exists: `Failed to Execute Command`, `Data Not Available`, `Resource offline`, `Communication Lost`, `Data Corrupted`.
 

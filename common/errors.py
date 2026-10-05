@@ -19,3 +19,23 @@ class ErrorCode(IntEnum):
     def code(self) -> int:
         """Return the wire byte for this error."""
         return int(self)
+
+    @property
+    def nature(self) -> str:
+        """Return the spec text the operator should read for this code."""
+        return _NATURE[self]
+
+
+_NATURE = {
+    ErrorCode.FAILED_TO_EXECUTE: "Failed to Execute Command",
+    ErrorCode.DATA_NOT_AVAILABLE: "Data Not Available",
+    ErrorCode.RESOURCE_OFFLINE: "Resource offline",
+    ErrorCode.COMMUNICATION_LOST: "Communication Lost",
+    ErrorCode.DATA_CORRUPTED: "Data Corrupted",
+    ErrorCode.HOT_SWITCH: "Hot switch",
+    ErrorCode.RELAY_FAULT: "Relay fault",
+}
+
+
+class RelayFault(Exception):
+    """The latch read back more than one coil, or not the coil just written."""

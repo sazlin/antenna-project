@@ -416,6 +416,24 @@ class RemoteLink:
         """Queue a status payload. The next idle poll offers RS and keeps the bytes."""
         self._pending_status = payload
 
+    def fail(self, command: Command, error: ErrorCode, source: int) -> bytes:
+        """Cache an ERR for the open sequence. The sequence number does not change."""
+        if self._open_sequence is None:
+            raise RuntimeError("no open command to fail")
+        raw = encode_frame(
+            Frame(
+                2,
+                1,
+                self._open_sequence,
+                Command.ERR,
+                bytes([int(error), source, command.byte]),
+            )
+        )
+        self._cached = raw
+        self._cached_sequence = self._open_sequence
+        self._open_sequence = None
+        return raw
+
     def finish(self, action: Action) -> bytes:
         """Cache the ACK for this sequence so a retry can resend it."""
         if self._open_sequence is None:
