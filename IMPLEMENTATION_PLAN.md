@@ -604,7 +604,7 @@ Commit: `feat: roll back state and report the image to reapply`
 
 ### Task 22. One relay on, or all off
 
-- [ ] Files: `remote/relays.py`, `tests/test_relays.py`.
+- [x] Files: `remote/relays.py`, `tests/test_relays.py`.
 
 Failing test: a `FakeLatch` records writes and returns the last write from `read`. `set_antenna(latch, 0, delay_ms=100, sleep=sleeper)` writes `[0]` and the sleeper records 100. Start from latch value 0. `set_antenna(latch, 2, delay_ms=100, sleep=sleeper)` writes `[0, 0b0010]` and sleeps 100 between them. The final `read()` is `0b0010`. No write contains more than one bit.
 
