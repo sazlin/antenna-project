@@ -951,7 +951,7 @@ Commit: `feat: keep the remote menu usable when the master link is down`
 
 ### Task 42. Button debounce
 
-- [ ] Files: `common/buttons.py`, `tests/test_buttons.py`.
+- [x] Files: `common/buttons.py`, `tests/test_buttons.py`.
 
 Failing test: `Debouncer(hold_ms=30)`. Sample Up pressed at t=0, still pressed at t=29, released at t=40. `events()` returns one `Press("up")` and no second event. A new press at t=100 returns a second `Press("up")`. Noise that is high for 10 ms and low again returns no event.
 
