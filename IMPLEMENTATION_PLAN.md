@@ -1249,7 +1249,7 @@ Commit: `feat: run every menu handler on the master and the remote`
 
 ### Task 54. Docstrings and module comments
 
-- [ ] Files: `tests/test_comments.py` and any module from earlier tasks that fails it.
+- [x] Files: `tests/test_comments.py` and any module from earlier tasks that fails it.
 
 Failing test: walk every function defined in `common`, `master`, and `remote`. Each has a non-empty `__doc__`. Each module's first statement is a string comment or the file starts with a `#` line. The test reads the source and requires the first non-empty line to start with `#`. `remote/atu_link.py` contains the AM0 sentence. `remote/relays.py` contains the phrase `only place a coil is turned on`.
 
