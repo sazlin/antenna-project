@@ -4,10 +4,11 @@
 from dataclasses import dataclass
 
 from common.commands import Command
+from common.display import publish
 from common.errors import ErrorCode, RelayFault
-from common.protocol import Action
+from common.protocol import Action, Status, pack_status
 from common.state import LinkState, commit
-from remote.atu_link import TestMode, encode_command
+from remote.atu_link import AtuLink, TestMode, encode_command
 from remote.button_emulation import Fallback, OptoBank
 from remote.relays import apply_antenna_command, safe_off
 
@@ -135,6 +136,92 @@ def _serial_command(link: object, action: Action, port: object, test_mode: TestM
         return link.finish(action)
     port.write(encode_command(action.command))
     return link.finish(action)
+
+
+def drain_rs485(
+    link: object,
+    rx: bytearray,
+    latch: object,
+    state: LinkState,
+    power: PowerView,
+    port: object,
+    test_mode: TestMode,
+    fallback: Fallback,
+    opto: OptoBank,
+) -> bytes | None:
+    """Take one master frame off the queue and run it. The caller sends the reply."""
+    if not rx:
+        return None
+    data = bytes(rx)
+    rx.clear()
+    reply = dispatch_frame(
+        data,
+        link=link,
+        latch=latch,
+        state=state,
+        power=power,
+        port=port,
+        mode="serial",
+        test_mode=test_mode,
+        fallback=fallback,
+        opto=opto,
+    )
+    return reply
+
+
+def poll_atu(atu: AtuLink, state: LinkState, link: object, now_ms: int) -> None:
+    """Commit a parsed tuner object once, then offer it on the next idle poll."""
+    atu.poll(now_ms)
+    status = atu.last_status
+    if status is None or atu._announced:
+        return
+    atu._announced = True
+    commit(
+        state,
+        forward_w=status.forward_w,
+        antenna_w=status.antenna_w,
+        swr=status.swr,
+        inductance_nh=status.inductance_nh,
+        capacitance_pf=status.capacitance_pf,
+        efficiency_pct=status.efficiency_pct,
+        auto=bool(status.auto),
+        bypass=bool(status.bypass),
+        order=status.order or "LC",
+        power_sample_ms=now_ms,
+    )
+    link.notify_status(
+        pack_status(
+            Status(
+                auto=bool(status.auto),
+                bypass=bool(status.bypass),
+                atu_link=True,
+                test_mode=False,
+                efficiency_valid=status.efficiency_pct is not None,
+                power_valid=status.forward_w is not None,
+                order=status.order or "LC",
+                forward_w=status.forward_w or 0.0,
+                swr=status.swr or 0.0,
+                inductance_nh=status.inductance_nh or 0,
+                capacitance_pf=status.capacitance_pf or 0,
+                efficiency_pct=status.efficiency_pct or 0,
+                antenna=state.antenna,
+                error_code=0,
+                error_source=0,
+            )
+        )
+    )
+
+
+def publish_display(state: LinkState, panel: object) -> None:
+    """Draw the current row. Link loss has already set the banner."""
+    publish(state, panel)
+
+
+def on_link_lost(state: LinkState, latch: object) -> None:
+    """Keep the selected antenna. The latch is not written when the master goes quiet."""
+    del latch
+    state.banner = "Communication Lost"
+    state.link_up = False
 
 
 def apply_menu(

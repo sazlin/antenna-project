@@ -114,6 +114,8 @@ class AtuLink:
         self._command: Command | None = None
         self._sent_ms = 0
         self._attempt = 0
+        self.last_status: TunerStatus | None = None
+        self._announced = False
 
     def send(self, command: Command, now_ms: int) -> ErrorCode | None:
         """Write one line unless a reply is already outstanding."""
@@ -161,7 +163,11 @@ class AtuLink:
             return ErrorCode.DATA_CORRUPTED
         self.busy = False
         self._attempt = 0
-        return _status_from_object(obj)
+        status = _status_from_object(obj)
+        if status is not None:
+            self.last_status = status
+            self._announced = False
+        return status
 
 
 class TestMode:

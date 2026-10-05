@@ -1080,7 +1080,7 @@ Commit: `feat: keep the current antenna when the RS485 link drops`
 
 ### Task 48. Master and remote simulator
 
-- [ ] Files: `tests/test_simulator.py`, `master/tasks.py`, `remote/tasks.py`.
+- [x] Files: `tests/test_simulator.py`, `master/tasks.py`, `remote/tasks.py`.
 
 Failing test: `run_exchange()` wires `MasterLink` and `RemoteLink` through two `bytearray` queues, no sockets. Script: master queues AT2. After `step()` calls, the remote latch reads `0b0010` and the master log contains `RX ACK AT2`. Then the master queues TUN. The fake ATU port receives `b'{"Tune":true}\n'`. The test feeds a multiline status object with `Forward` 10.0, `Power` 9.0, `SWR` 1.10, `Auto` true, `Bypass` false, and `efficency` 90, using the brace rules in Frozen ATU JSON. After the status handshake, `screen_lines` on the master reading is exactly `("10.0W          .", "1.10", "9.0W", "90%")`. `test_at2_then_tune_against_fake_atu` names that one screen. Line 3 is the `Power` field. It is not 10.0 times 0.90.
 

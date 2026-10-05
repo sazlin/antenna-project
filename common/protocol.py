@@ -117,6 +117,11 @@ class MasterLink:
         self._phase = "idle"
         self._status: Status | None = None
         self._buffer = bytearray()
+        self._queue: list[tuple[Command, bytes]] = []
+
+    def enqueue(self, command: Command, payload: bytes = b"") -> None:
+        """Queue a command to send on the next idle poll instead of HHH."""
+        self._queue.append((command, payload))
 
     def poll(self, now_ms: int) -> bytes | None:
         """Send the next master frame, or None while a reply is still in time."""
@@ -130,6 +135,9 @@ class MasterLink:
             return raw
         if now_ms < self._next_poll_ms:
             return None
+        if self._queue:
+            command, payload = self._queue.pop(0)
+            return self._transmit(command, payload, now_ms)
         return self._transmit(Command.HHH, b"", now_ms)
 
     def feed(self, data: bytes) -> None:
