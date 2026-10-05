@@ -1331,7 +1331,7 @@ Commit: `docs: record the ukoda map and the Forward field diff`
 
 ### Task 59. Flashing document
 
-- [ ] Files: `docs/FLASHING.md`, `tests/test_docs_flashing.py`.
+- [x] Files: `docs/FLASHING.md`, `tests/test_docs_flashing.py`.
 
 Failing test: the doc contains `v1.29.0`, `RPI_PICO2_W`, `mpremote`, `cp -r common`, `master/main.py`, `:main.py`, `BOOTSEL`, and `pk2cmd -PPIC16F1938 -GF`. It says to back up the original PIC hex before writing.
 
