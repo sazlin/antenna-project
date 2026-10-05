@@ -937,7 +937,7 @@ Commit: `feat: navigate the five-button menu`
 
 ### Task 41. Remote menu works while the link is down
 
-- [ ] Files: `common/menu.py`, `tests/test_menu.py`.
+- [x] Files: `common/menu.py`, `tests/test_menu.py`.
 
 Failing test: `Menu(REMOTE_MENU, link_up=False)`. Open, enter Antenna, select Antenna 4. The return is still `at4`. `link_up` is not consulted by `select`.
 

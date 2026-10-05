@@ -1,4 +1,18 @@
-from common.menu import MASTER_MENU, Menu
+from common.menu import MASTER_MENU, REMOTE_MENU, Menu
+
+
+def test_remote_select_works_when_link_is_down():
+    menu = Menu(REMOTE_MENU, link_up=False)
+    labels = [item.label for item in REMOTE_MENU]
+    assert "Shutdown" not in labels
+    menu.open_menu()
+    menu.right()
+    menu.down()
+    menu.down()
+    menu.down()
+    assert menu.label == "Antenna 4"
+    assert menu.select() == "at4"
+    assert menu.link_up is False
 
 
 def test_select_leaf_exits_with_handler():
