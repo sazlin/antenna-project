@@ -1359,7 +1359,7 @@ Commit: `docs: write the bench procedure from no RF up to antennas`
 
 ### Task 61. Customizing, project readme, summary
 
-- [ ] Files: `docs/CUSTOMIZING.md`, `docs/README.md`, `SUMMARY.md`, `README.md`, `tests/test_docs_rest.py`.
+- [x] Files: `docs/CUSTOMIZING.md`, `docs/README.md`, `SUMMARY.md`, `README.md`, `tests/test_docs_rest.py`.
 
 Failing test: `docs/CUSTOMIZING.md` tells the operator how to add a command in `common/commands.py`, change a button in `master/config.py`, add a menu item in `common/menu.py`, and change `RELAY_DELAY_MS`. `docs/README.md` contains the words master, remote, RS485, and ATU-100, and it points at `docs/WIRING.md` and `docs/FLASHING.md`. Root `README.md` contains `docs/README.md` and is no longer only the line `antenna-project`. `SUMMARY.md` lists host tests as the verification that ran without hardware, names the ukoda hex as not flashed here, says a fork was required to add `Forward`, says that fork was not compiled here, and lists the eight client decisions as open for the client to confirm.
 
@@ -1384,7 +1384,7 @@ Commit: `docs: add the operator guide, the summary, and a README pointer`
 
 ### Task 62. Fix the host suite only if task 61's run failed
 
-- [ ] Files: none new unless the host gate in task 61 exited nonzero.
+- [x] Files: none new unless the host gate in task 61 exited nonzero.
 
 Do not run the suite before task 61. Task 61 owns the first run. Start this task only when that run failed.
 
