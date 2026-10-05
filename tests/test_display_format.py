@@ -1,4 +1,43 @@
-from common.display import format_capacitance_pf, format_inductance_nh, format_power, format_swr
+from common.display import Reading, format_capacitance_pf, format_inductance_nh, format_power, format_swr, screen_lines
+
+
+def _reading(**overrides: object) -> Reading:
+    values = {
+        "forward_w": 100.0,
+        "swr": 1.15,
+        "inductance_nh": 1250,
+        "capacitance_pf": 150,
+        "auto": True,
+        "bypass": False,
+        "order": "LC",
+        "efficiency": None,
+        "antenna_w": None,
+    }
+    values.update(overrides)
+    return Reading(**values)
+
+
+def test_auto_marker_and_lc_order():
+    lines = screen_lines(_reading())
+    assert lines[0] == "100.0W         ."
+    assert len(lines[0]) == 16
+    assert lines[0][-1] == "."
+    assert lines[1] == "1.15"
+    assert lines[2] == "1.25uH"
+    assert lines[3] == "150pF"
+
+
+def test_bypass_marker_wins():
+    lines = screen_lines(_reading(auto=True, bypass=True))
+    assert lines[0].endswith("_")
+    assert len(lines[0]) == 16
+
+
+def test_cl_swaps_l_and_c():
+    lines = screen_lines(_reading(order="CL", auto=False))
+    assert lines[2] == "150pF"
+    assert lines[3] == "1.25uH"
+    assert lines[0].endswith(" ")
 
 
 def test_nanohenries_become_microhenries():

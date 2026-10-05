@@ -873,7 +873,7 @@ Commit: `feat: format L and C for the tuner screen`
 
 ### Task 37. Mode marker and L/C order
 
-- [ ] Files: `common/display.py`, `tests/test_display_format.py`.
+- [x] Files: `common/display.py`, `tests/test_display_format.py`.
 
 Failing test: `screen_lines` for forward 100.0, swr 1.15, 1250 nH, 150 pF, auto True, bypass False, order `LC`, efficiency None returns line 1 `100.0W         .` (16 characters, last is `.`), line 2 `1.15`, line 3 `1.25uH`, line 4 `150pF`. The same reading with bypass True ends line 1 with `_` even if auto is also True. Order `CL` swaps lines 3 and 4.
 
