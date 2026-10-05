@@ -1,4 +1,56 @@
-from common.menu import MASTER_MENU, REMOTE_MENU, Menu
+from common.commands import Command
+from common.display import publish
+from common.menu import MASTER_MENU, REMOTE_MENU, Menu, render_menu
+from common.state import LinkState
+from master.tasks import master_on_press
+
+
+class _Panel:
+    def __init__(self) -> None:
+        self.lines = None
+
+    def show_lines(self, lines: tuple[str, str, str, str]) -> None:
+        self.lines = lines
+
+
+def test_menu_button_draws_the_highlighted_row():
+    menu = Menu(MASTER_MENU)
+    state = LinkState(
+        forward_w=5.0,
+        swr=1.15,
+        inductance_nh=1250,
+        capacitance_pf=150,
+        order="LC",
+        auto=False,
+        bypass=False,
+    )
+    queue: list[Command] = []
+    master_on_press("menu", queue, state, menu)
+    assert menu.active is True
+    labels, highlight = render_menu(menu)
+    assert len(labels) <= 4
+    assert all(len(label) <= 16 for label in labels)
+    assert labels[highlight] == menu.label
+    master_on_press("down", queue, state, menu)
+    labels, highlight = render_menu(menu)
+    assert labels[highlight] == "Tuner"
+    master_on_press("right", queue, state, menu)
+    for _ in range(5):
+        master_on_press("down", queue, state, menu)
+    labels, highlight = render_menu(menu)
+    assert len(labels) <= 4
+    assert labels[highlight] == menu.label
+    master_on_press("left", queue, state, menu)
+    while menu.label != "Exit Menu":
+        master_on_press("down", queue, state, menu)
+    master_on_press("select", queue, state, menu)
+    assert menu.active is False
+    panel = _Panel()
+    publish(state, panel)
+    assert panel.lines[1] == "1.15"
+    queue.clear()
+    master_on_press("tune", queue, state, menu)
+    assert queue == [Command.TUN]
 
 
 def test_remote_select_works_when_link_is_down():

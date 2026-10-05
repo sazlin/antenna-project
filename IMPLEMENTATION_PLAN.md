@@ -1166,7 +1166,7 @@ Commit: `feat: clear the relay latch before the watchdog starts`
 
 ### Task 53. Wire buttons, LEDs, and the local menu into the tasks
 
-- [ ] Files: `master/tasks.py`, `remote/tasks.py`, `tests/test_buttons_to_commands.py`.
+- [x] Files: `master/tasks.py`, `remote/tasks.py`, `tests/test_buttons_to_commands.py`.
 
 Failing test: `master_on_press("tune", queue)` with the menu closed appends `Command.TUN`. `master_on_press("antenna", queue)` from a last antenna of 1 appends AT2. From 4 it appends AT1. It never appends AT0. `master_on_press("bypass", queue)` appends BYP1 when bypass is false and BYP0 when bypass is true. `master_on_press("am", queue)` appends AM0 when auto is false and AM1 when auto is true. `remote_on_press("select", menu, local_queue)` with the remote menu open on Antenna 1 appends `at1` even when `link_up` is false. LED helper `leds_for(link_up=False, fault=True, auto=True, bypass=False, rf=True)` returns Link OK false, Error true, Auto Mode true, Bypass false, RF Present true.
 

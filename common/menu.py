@@ -117,3 +117,10 @@ class Menu:
         self._stack.append((self._rows, self._index))
         self._rows = item.children
         self._index = 0
+
+
+def render_menu(menu: Menu) -> tuple[list[str], int]:
+    """Return at most four labels and the highlight index inside that window."""
+    start = 0 if menu._index < 4 else menu._index - 3
+    window = menu._rows[start : start + 4]
+    return [item.label for item in window], menu._index - start

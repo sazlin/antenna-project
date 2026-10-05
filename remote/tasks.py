@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from common.commands import Command
 from common.display import publish
 from common.errors import ErrorCode, RelayFault
+from common.menu import Menu
 from common.protocol import Action, Status, pack_status
 from common.state import LinkState, commit
 from remote.atu_link import AtuLink, TestMode, encode_command
@@ -212,9 +213,37 @@ def poll_atu(atu: AtuLink, state: LinkState, link: object, now_ms: int) -> None:
     )
 
 
-def publish_display(state: LinkState, panel: object) -> None:
-    """Draw the current row. Link loss has already set the banner."""
+def _set_bit(value: int, bit: int, on: bool) -> int:
+    """Turn one LED bit on or off and leave the other bits alone."""
+    mask = 1 << bit
+    if on:
+        return value | mask
+    return value & ~mask
+
+
+def write_leds(state: LinkState, olat: object) -> None:
+    """Drive GPA5 Link OK and GPA6 Error. Relay bits on port B are not touched."""
+    error = not state.link_up or bool(state.banner)
+    olat.port_a = _set_bit(olat.port_a, 5, state.link_up)
+    olat.port_a = _set_bit(olat.port_a, 6, error)
+
+
+def remote_on_press(name: str, menu: Menu, local_queue: list[str]) -> None:
+    """Navigate the local menu. Select still returns a handler when the master is quiet."""
+    if name == "select":
+        handler = menu.select()
+        if handler and handler != "exit":
+            local_queue.append(handler)
+        return
+    if menu.active and name in ("up", "down", "left", "right"):
+        getattr(menu, name)()
+
+
+def publish_display(state: LinkState, panel: object, olat: object | None = None) -> None:
+    """Draw the current row and the remote LEDs. Link loss has already set the banner."""
     publish(state, panel)
+    if olat is not None:
+        write_leds(state, olat)
 
 
 def on_link_lost(state: LinkState, latch: object) -> None:
