@@ -8,6 +8,8 @@ from common.commands import CODE_TO_COMMAND, Command
 
 START = 0x7E
 END = 0x7F
+ESCAPE = 0x7D
+_SPECIAL = (START, END, ESCAPE)
 
 
 @dataclass
@@ -34,11 +36,38 @@ def _body(frame: Frame) -> bytes:
     ) + frame.payload
 
 
+def _escape(data: bytes) -> bytes:
+    """Hide start, end, and escape bytes so they cannot split the frame."""
+    out = bytearray()
+    for byte in data:
+        if byte in _SPECIAL:
+            out.append(ESCAPE)
+            out.append(byte ^ 0x20)
+        else:
+            out.append(byte)
+    return bytes(out)
+
+
+def _unescape(data: bytes) -> bytes:
+    """Restore a payload after the wire escape pairs are removed."""
+    out = bytearray()
+    index = 0
+    while index < len(data):
+        if data[index] == ESCAPE and index + 1 < len(data):
+            out.append(data[index + 1] ^ 0x20)
+            index += 2
+        else:
+            out.append(data[index])
+            index += 1
+    return bytes(out)
+
+
 def encode_frame(frame: Frame) -> bytes:
     """Wrap a frame with the start byte, little-endian CRC, and end byte."""
     body = _body(frame)
     crc = crc16_ccitt(body)
-    return bytes([START]) + body + bytes([crc & 0xFF, (crc >> 8) & 0xFF, END])
+    covered = body + bytes([crc & 0xFF, (crc >> 8) & 0xFF])
+    return bytes([START]) + _escape(covered) + bytes([END])
 
 
 def _frame_from_body(body: bytes) -> Frame | None:
@@ -58,7 +87,7 @@ def decode_frames(data: bytes) -> tuple[list[Frame], bytes]:
     """Decode one complete unescaped frame. Anything else is not delivered."""
     if len(data) < 9 or data[0] != START or data[-1] != END:
         return [], b""
-    raw = data[1:-1]
+    raw = _unescape(data[1:-1])
     body, crc_lo, crc_hi = raw[:-2], raw[-2], raw[-1]
     if crc16_ccitt(body) != (crc_lo | (crc_hi << 8)):
         return [], b""

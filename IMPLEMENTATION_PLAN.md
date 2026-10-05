@@ -344,7 +344,7 @@ Commit: `feat: decode an AT1 RS485 frame`
 
 ### Task 05. Escape binary payloads
 
-- [ ] Files: `common/protocol.py`, `tests/test_frame.py`.
+- [x] Files: `common/protocol.py`, `tests/test_frame.py`.
 
 Failing test: payload `bytes([0x7E, 0x00, 0x7D, 0x7F])` round-trips through `encode_frame` and `decode_frames`. The encoded form contains `7d 5e`, `7d 5d`, and `7d 5f` for those three special bytes, and the decoded payload equals the original.
 
