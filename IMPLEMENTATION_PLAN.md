@@ -372,7 +372,7 @@ Commit: `feat: hold a partial RS485 frame until it ends`
 
 ### Task 07. Reject a bad CRC
 
-- [ ] Files: `common/protocol.py`, `tests/test_frame.py`.
+- [x] Files: `common/protocol.py`, `tests/test_frame.py`.
 
 Failing test: flip the CRC low byte of the known AT1 frame to `0x00`. `decode_frames` returns no frames and a leftover that does not include the corrupted frame. The following byte `0x7E` plus a second valid AT1 frame still decodes as one AT1. The corrupted frame is dropped, not delivered.
 

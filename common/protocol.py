@@ -122,8 +122,11 @@ def decode_frames(data: bytes) -> tuple[list[Frame], bytes]:
         if end is None:
             return frames, data[index:]
         frame = _checked_frame(_unescape(data[index + 1 : end]))
-        if frame is not None:
-            frames.append(frame)
+        if frame is None:
+            # The opening start was a false sync. Look for the next 0x7E.
+            index += 1
+            continue
+        frames.append(frame)
         index = end + 1
     return frames, b""
 

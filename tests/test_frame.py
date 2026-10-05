@@ -7,6 +7,17 @@ def test_encode_at1_matches_known_frame():
     assert encode_frame(frame).hex() == "7e010201110047517f"
 
 
+def test_bad_crc_is_dropped():
+    bad = bytes.fromhex("7e010201110000517f")
+    frames, leftover = decode_frames(bad)
+    assert frames == []
+    assert bad not in leftover
+    stream = bad + bytes([0x7E]) + bytes.fromhex("7e010201110047517f")
+    frames, leftover = decode_frames(stream)
+    assert [frame.command for frame in frames] == [Command.AT1]
+    assert leftover == b""
+
+
 def test_truncated_frame_waits():
     partial = bytes.fromhex("7e010201110047")
     frames, leftover = decode_frames(partial)
