@@ -450,7 +450,7 @@ Commit: `feat: retry one poll three times before counting a miss`
 
 ### Task 12. Five misses set link loss
 
-- [ ] Files: `common/protocol.py`, `tests/test_link_master.py`.
+- [x] Files: `common/protocol.py`, `tests/test_link_master.py`.
 
 Failing test: drive five missed polls with no inbound bytes. After the fifth miss `link_lost` is true. `display_banner()` returns `Communication Lost`. A later valid ACK for the current sequence clears `link_lost`.
 

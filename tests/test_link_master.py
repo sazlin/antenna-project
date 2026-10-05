@@ -29,6 +29,23 @@ def test_idle_poll_sends_hhh():
     assert "TX HHH" in link.log
 
 
+def test_five_misses_sets_communication_lost():
+    link = MasterLink(poll_ms=200, reply_timeout_ms=500, reply_tries=3, miss_limit=5)
+    now = 200
+    for _ in range(5):
+        assert link.poll(now) is not None
+        assert link.poll(now + 500) is not None
+        assert link.poll(now + 1000) is not None
+        assert link.poll(now + 1500) is None
+        now += 1700
+    assert link.misses == 5
+    assert link.link_lost is True
+    assert link.display_banner() == "Communication Lost"
+    frames, _leftover = decode_frames(link.poll(now))
+    link.feed(_ack(frames[0]))
+    assert link.link_lost is False
+
+
 def test_three_tries_then_one_miss():
     link = MasterLink(poll_ms=200, reply_timeout_ms=500, reply_tries=3, miss_limit=5)
     first = decode_frames(link.poll(200))[0][0]
