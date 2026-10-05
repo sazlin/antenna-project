@@ -260,7 +260,7 @@ Follow the file from top to bottom. Tasks 63, 64, 65, and 66 keep those numbers 
 
 ### Task 01. CRC-16/CCITT-FALSE
 
-- [ ] Files: `pytest.ini`, `common/__init__.py`, `master/__init__.py`, `remote/__init__.py`, `common/protocol.py`, `tests/test_crc.py`.
+- [x] Files: `pytest.ini`, `common/__init__.py`, `master/__init__.py`, `remote/__init__.py`, `common/protocol.py`, `tests/test_crc.py`.
 
 Failing test in `tests/test_crc.py`:
 
