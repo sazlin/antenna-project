@@ -572,7 +572,7 @@ Commit: `feat: put the error code and source in the ERR payload`
 
 ### Task 20. Commit saves the previous state
 
-- [ ] Files: `common/state.py`, `tests/test_state.py`.
+- [x] Files: `common/state.py`, `tests/test_state.py`.
 
 Failing test: `LinkState` starts with `antenna == 0`, `relay_mask == 0`, `led_bits == 0`, `button_mask == 0`, `order == "LC"`, and `previous is None`. `commit(state, antenna=2, relay_mask=0b0010, led_bits=0b0001, button_mask=0b0100)` makes those current fields match the new values and the previous fields stay 0. A second commit to antenna 4 and `relay_mask=0b1000` leaves previous antenna 2 and previous `relay_mask` `0b0010`. The previous object is a copy. Mutating the current `relay_mask` after commit does not change `previous.relay_mask`.
 
