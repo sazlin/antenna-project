@@ -16,6 +16,51 @@ def _run(tasks, feeds: list[int]) -> None:
     run_once(tasks, interrupt=lambda: None, watchdog=lambda: feeds.append(1))
 
 
+def _forward_status(watts: float) -> bytes:
+    return (
+        "{\n"
+        f'  "Forward": {watts:.1f},\n'
+        '  "SWR": 1.10\n'
+        "}\n"
+    ).encode()
+
+
+def test_committed_forward_power_blocks_the_next_antenna_command():
+    blocked = RemoteApp()
+    blocked.now_ms = 1000
+    _load(blocked.atu_ring, blocked.atu_flags, _forward_status(5.0))
+    _run(build_remote_tasks(blocked), [])
+    assert blocked.state.forward_w == 5.0
+    _load(blocked.rs485, blocked.rs485_flags, encode_frame(Frame(1, 2, 2, Command.AT2, b"")))
+    _run(build_remote_tasks(blocked), [])
+    assert blocked.latch.read() == 0
+    err = decode_frames(bytes(blocked.tx))[0][0]
+    assert err.command is Command.ERR
+    assert err.payload == bytes([6, 2, 0x12])
+
+    allowed = RemoteApp()
+    allowed.now_ms = 1000
+    _load(allowed.atu_ring, allowed.atu_flags, _forward_status(1.0))
+    _run(build_remote_tasks(allowed), [])
+    _load(allowed.rs485, allowed.rs485_flags, encode_frame(Frame(1, 2, 2, Command.AT2, b"")))
+    _run(build_remote_tasks(allowed), [])
+    assert allowed.latch.read() == 0b0010
+    ack = decode_frames(bytes(allowed.tx))[0][0]
+    assert ack.command is Command.ACK
+    assert ack.payload == bytes([0x12])
+
+    shutdown = RemoteApp()
+    shutdown.latch.value = 0b0010
+    shutdown.state.antenna = 2
+    shutdown.state.relay_mask = 0b0010
+    shutdown.now_ms = 1000
+    _load(shutdown.atu_ring, shutdown.atu_flags, _forward_status(50.0))
+    _run(build_remote_tasks(shutdown), [])
+    _load(shutdown.rs485, shutdown.rs485_flags, encode_frame(Frame(1, 2, 3, Command.F86, b"")))
+    _run(build_remote_tasks(shutdown), [])
+    assert shutdown.latch.read() == 0
+
+
 def test_master_pass_polls_when_the_clock_reaches_poll_ms():
     from common import hal
     from master.main import run_production_pass

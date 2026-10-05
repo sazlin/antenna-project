@@ -340,6 +340,14 @@ class RemoteApp:
         self.port_writes.append(data)
 
 
+def _power_from_state(app: RemoteApp) -> PowerView:
+    """Use the committed forward sample. A missing timestamp is already stale."""
+    sample = app.state.power_sample_ms
+    if sample is None:
+        sample = app.now_ms - config.POWER_STALE_MS
+    return PowerView(app.state.forward_w, sample, app.now_ms)
+
+
 def _remote_drain(app: RemoteApp) -> None:
     """Accept a master frame, or call link loss when the master has been quiet."""
     if app.now_ms - app.last_accept_ms >= config.REMOTE_SILENCE_MS and app.state.link_up:
@@ -347,7 +355,8 @@ def _remote_drain(app: RemoteApp) -> None:
     data = drain_rx(app.rs485, app.rs485_flags)
     if not data:
         return
-    power = PowerView(app.power.forward_w, app.power.sample_ms, app.now_ms)
+    power = _power_from_state(app)
+    app.power = power
     reply = dispatch_frame(
         data,
         link=app.link,
@@ -382,6 +391,7 @@ def _remote_poll_atu(app: RemoteApp) -> None:
     err = poll_atu(app.atu, app.state, app.link, app.now_ms)
     if err:
         app.tx.extend(err)
+    app.power = _power_from_state(app)
     app.shared["antenna_w"] = app.state.antenna_w
 
 
